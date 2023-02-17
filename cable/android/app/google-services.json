@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "870651296158",
+    "project_id": "cableview-73b36",
+    "storage_bucket": "cableview-73b36.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:870651296158:android:a58aa8aa6641ca73823e8f",
+        "android_client_info": {
+          "package_name": "com.cable.cable"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "870651296158-vonbv0ru8qtqko993jn7tpvnkeib0g01.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD38eJrW9kJjeT1plFiAl3wQIipNBKnDt4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "870651296158-vonbv0ru8qtqko993jn7tpvnkeib0g01.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
