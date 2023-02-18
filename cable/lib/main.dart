@@ -95,12 +95,12 @@ class _MyHomePageState extends State<MyHomePage> {
     try{
       setState(() async {
         _mobileNo = (await MobileNumber.mobileNumber)!;
-        print(await MobileNumber.getSimCards);
-
       });
     }
     on PlatformException catch (e){
-
+      setState(() {
+        _mobileNo = "Not Found";
+      });
     }
 
   }
@@ -630,7 +630,9 @@ class _MyHomePageState extends State<MyHomePage> {
               mapType: MapType.normal,
               trafficEnabled: true,
               onTap: (lat){
-                print(_mobileNo);
+                if(_mobileNo=="Not Found"){
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Can't Fetch Number ")));
+                }
                 // print(initMobileNumberState().toString());
               },
               initialCameraPosition: CameraPosition(
