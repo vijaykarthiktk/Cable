@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:system_theme/system_theme.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:mobile_number/mobile_number.dart';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -68,13 +69,40 @@ class _MyHomePageState extends State<MyHomePage> {
   String crf = 'K10E0180013';
 
   LatLng currentPosition = const LatLng(11.1795878, 75.9271907);
+
+  late String _mobileNo;
+
   @override
   initState() {
     // TODO: implement initState
     super.initState();
     Geolocator.requestPermission();
     Geolocator.getCurrentPosition();
+    MobileNumber.listenPhonePermission((isPermissionGranted){
+      if(isPermissionGranted){
+        initMobileNumberState();
+      }
+    });
+    initMobileNumberState();
     Firebase.initializeApp().whenComplete(() => loadMarkers());
+  }
+
+  initMobileNumberState()  async {
+    if(!await MobileNumber.hasPhonePermission){
+      await MobileNumber.requestPhonePermission;
+      return;
+    }
+    try{
+      setState(() async {
+        _mobileNo = (await MobileNumber.mobileNumber)!;
+        print(await MobileNumber.getSimCards);
+
+      });
+    }
+    on PlatformException catch (e){
+
+    }
+
   }
   String getImage(String crf) {
     return "http://spbhss.live/CableCard/cable/$crf.jpg";
@@ -173,21 +201,18 @@ class _MyHomePageState extends State<MyHomePage> {
           print(base64Encode(bytes));
           return uploadImage(base64Encode(bytes).toString(), crf);
         }
-
-        void getImagePath(ImageSource source, String _crf) async {
+        void getImagePath(ImageSource source, String crf) async {
           image = await _picker.pickImage(
             source: source,
             preferredCameraDevice: CameraDevice.rear,
           );
-
           setState(() {
             String base_data =
-                convertFileToBase64(image!.path, _crf).toString();
+                convertFileToBase64(image!.path, crf).toString();
 
             // print(base_data);
           });
         }
-
         return Marker(
           markerId: MarkerId(crf),
           position: LatLng(lat, long),
@@ -604,6 +629,10 @@ class _MyHomePageState extends State<MyHomePage> {
               myLocationButtonEnabled: true,
               mapType: MapType.normal,
               trafficEnabled: true,
+              onTap: (lat){
+                print(_mobileNo);
+                // print(initMobileNumberState().toString());
+              },
               initialCameraPosition: CameraPosition(
                 target: currentPosition,
                 zoom: 13.0,
