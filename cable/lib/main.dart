@@ -8,19 +8,18 @@ import 'package:system_theme/system_theme.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:mobile_number/mobile_number.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:path_provider/path_provider.dart';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-void main() {
+
+ main() async {
   SystemTheme.accentColor;
   runApp(const MyApp());
 }
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -76,11 +75,12 @@ class _MyHomePageState extends State<MyHomePage> {
   late String _mobileNo;
 
   @override
-  initState() {
+  initState()  {
     // TODO: implement initState
     super.initState();
     Geolocator.requestPermission();
     Geolocator.getCurrentPosition();
+
     MobileNumber.listenPhonePermission((isPermissionGranted){
       if(isPermissionGranted){
         initMobileNumberState();
@@ -96,8 +96,9 @@ class _MyHomePageState extends State<MyHomePage> {
       return;
     }
     try{
-      setState(() async {
-        _mobileNo = (await MobileNumber.mobileNumber)!;
+      var mob = await MobileNumber.mobileNumber;
+      setState(() {
+        _mobileNo = mob!;
       });
     }
     on PlatformException catch (e){
@@ -107,6 +108,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
   }
+
   String getImage(String crf) {
     return "http://spbhss.live/CableCard/cable/$crf.jpg";
   }
@@ -137,10 +139,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   _onMapCreated(GoogleMapController controller) {}
 
-  uploadingData(String crf, String chipid, bool status, cname, int mobile, GeoPoint cords) async {
-    await FirebaseFirestore.instance.collection("marker").add({
-      'crf': crf,
-      'chipid': chipid,
+  uploadingData(String crf, String chipID, bool status, cname, int mobile, GeoPoint cords) async {
+    await FirebaseFirestore.instance.collection("cable").doc("crf").set({
+      'chipid': chipID,
       'status': status,
       'cname': cname,
       'mobile': mobile,
@@ -169,12 +170,12 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   loadMarkers() async {
-    final documentSnapshot =
-        await FirebaseFirestore.instance.collection('marker').get();
+    final documentSnapshot = await FirebaseFirestore.instance.collection('marker').get();
     final users = documentSnapshot.docs;
+
     setState(() {
       _markers = users.map((user) {
-        // uploadingData(location['CRF'].toString(),location['CHIPID'].toString(), location['STATUS']=="YES"?true:false,location['CNAME'].toString(),location['MOBILE'],GeoPoint(location['LAT'], location['LONG']));
+        // uploadingData(user['CRF'].toString(),user['CHIPID'].toString(), user['STATUS']=="YES"?true:false,user['CNAME'].toString(),user['MOBILE'],GeoPoint(user['LAT'], user['LONG']));
         double lat = (user['cords'] as GeoPoint).latitude;
         double long = (user['cords'] as GeoPoint).longitude;
         String crf = user['crf'].toString();
@@ -632,10 +633,17 @@ class _MyHomePageState extends State<MyHomePage> {
               myLocationButtonEnabled: true,
               mapType: MapType.normal,
               trafficEnabled: true,
+              cameraTargetBounds: CameraTargetBounds(
+                  LatLngBounds(
+                      northeast: LatLng(11.199369, 75.934386), 
+                      southwest: LatLng(11.154130, 75.903564)
+                  )
+              ),
               onTap: (lat){
                 if(_mobileNo=="Not Found"){
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Can't Fetch Number ")));
                 }
+                print(_mobileNo);
                 // print(initMobileNumberState().toString());
               },
               initialCameraPosition: CameraPosition(
@@ -662,6 +670,9 @@ class _MyHomePageState extends State<MyHomePage> {
                         contentPadding: EdgeInsets.only(left: 15, top: 11),
                         border: InputBorder.none,
                       ),
+                      onTap: (){
+                        showSearch(context: context, delegate: DataSearch());
+                      },
                     ))),
           ],
         ),
@@ -714,4 +725,48 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
   }
+}
+class DataSearch extends SearchDelegate<String>{
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return[
+      IconButton(
+          onPressed: (){
+            query = "";
+          },
+          icon: Icon(Icons.clear))
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+        onPressed: (){
+          close(context, "null");
+          },
+        icon: AnimatedIcon(
+          icon: AnimatedIcons.menu_arrow,
+          progress: transitionAnimation,
+        )
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    // TODO: implement buildResults
+    throw UnimplementedError();
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    final suggestionList = query;
+    return ListView.builder(
+      itemCount: 1,
+        itemBuilder: (context, index){
+      ListTile(
+        title: Text("hu"),
+      );
+    });
+  }
+   
 }
