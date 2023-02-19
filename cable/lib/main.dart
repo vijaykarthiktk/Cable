@@ -56,6 +56,7 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
+
 class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _crfController =
       TextEditingController(text: 'K10E0180013');
@@ -66,7 +67,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
   int _pageIndex = 0;
 
-  List<Marker> _markers = [];
+  List<Marker> _markersCable = [];
+  List<Marker> _makerInternet = [];
+
+  late GoogleMapController _googleMapController ;
 
   String crf = 'K10E0180013';
 
@@ -74,20 +78,26 @@ class _MyHomePageState extends State<MyHomePage> {
 
   late String _mobileNo;
 
+  double lat = 0;
+  double long = 0;
+
   @override
   initState()  {
     // TODO: implement initState
     super.initState();
     Geolocator.requestPermission();
     Geolocator.getCurrentPosition();
-
+    getCurrentLocation();
     MobileNumber.listenPhonePermission((isPermissionGranted){
       if(isPermissionGranted){
         initMobileNumberState();
       }
     });
     initMobileNumberState();
-    Firebase.initializeApp().whenComplete(() => loadMarkers());
+    Firebase.initializeApp().whenComplete(() {
+      loadMarkersCable();
+      loadMarkerInternet();
+    });
   }
 
   initMobileNumberState()  async {
@@ -113,6 +123,15 @@ class _MyHomePageState extends State<MyHomePage> {
     return "http://spbhss.live/CableCard/cable/$crf.jpg";
   }
 
+   getCurrentLocation() async {
+    final location = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best,forceAndroidLocationManager: true );
+    setState(() {
+      lat = location.latitude;
+      long = location.longitude;
+    });
+    print(lat);
+  }
+
   String capitalize(String s) {
     List<String> names = s.replaceAll(".", " ").split(" ");
     String returnName = "";
@@ -127,20 +146,12 @@ class _MyHomePageState extends State<MyHomePage> {
     return returnName.trim();
   }
 
-  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> fetchData() async {
-    final documentSnapshot =
-        await FirebaseFirestore.instance.collection('marker').get();
-    final users = documentSnapshot.docs;
-    if (kDebugMode) {
-      print((users[0]['cords'] as GeoPoint).longitude.runtimeType);
-    }
-    return users;
+  _onMapCreated(GoogleMapController controller) {
+    _googleMapController = controller;
   }
 
-  _onMapCreated(GoogleMapController controller) {}
-
-  uploadingData(String crf, String chipID, bool status, cname, int mobile, GeoPoint cords) async {
-    await FirebaseFirestore.instance.collection("cable").doc("crf").set({
+  uploadingDataCable(String crf, String chipID, bool status, cname, int mobile, GeoPoint cords) async {
+    await FirebaseFirestore.instance.collection("marker").doc("crf").set({
       'chipid': chipID,
       'status': status,
       'cname': cname,
@@ -149,7 +160,17 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  updateData(GeoPoint cords, String crf, String name, int phone) async {
+  uploadingDataInternet(String userID, String name, int phone, String status, String isp) async {
+    await FirebaseFirestore.instance.collection("internet").add({
+      'user_id':userID,
+      'name':capitalize(name),
+      'mobile':phone,
+      'status':status.toUpperCase(),
+      'isp': isp.toUpperCase()
+    });
+  }
+
+  updateDataCable(GeoPoint cords, String crf, String name, int phone) async {
     await FirebaseFirestore.instance
         .collection('marker')
         .where('crf', isEqualTo: crf)
@@ -169,12 +190,32 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  loadMarkers() async {
-    final documentSnapshot = await FirebaseFirestore.instance.collection('marker').get();
-    final users = documentSnapshot.docs;
+  updateDataInternet(GeoPoint cords, String crf, String name, int phone) async {
+    await FirebaseFirestore.instance
+        .collection('marker')
+        .where('crf', isEqualTo: crf)
+        .get()
+        .then((querySnapshot) {
+      querySnapshot.docs.forEach((element) {
+        element.reference.update({
+          'cords': cords,
+          'cname' : name,
+          'mobile': phone,
+          'date_time': "${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year} ${DateTime.now().hour%12}:${DateTime.now().minute}"
+          // "date_time":DateFormat.jm().format(DateTime.now())
+        }).whenComplete(() {
+          // print(querySnapshot.docs.asMap()['cname']);
+        });
+      });
+    });
+  }
 
+  loadMarkersCable() async {
+    FirebaseFirestore.instance.settings = Settings(persistenceEnabled: true, );
+    final documentSnapshot = await FirebaseFirestore.instance.collection('marker').get(const GetOptions(source: Source.cache));
+    var users = documentSnapshot.docs;
     setState(() {
-      _markers = users.map((user) {
+      _markersCable = users.map((user) {
         // uploadingData(user['CRF'].toString(),user['CHIPID'].toString(), user['STATUS']=="YES"?true:false,user['CNAME'].toString(),user['MOBILE'],GeoPoint(user['LAT'], user['LONG']));
         double lat = (user['cords'] as GeoPoint).latitude;
         double long = (user['cords'] as GeoPoint).longitude;
@@ -257,10 +298,10 @@ class _MyHomePageState extends State<MyHomePage> {
                               showModalBottomSheet(
                                   context: context,
                                   builder: (BuildContext context) {
-                                    return Container(
+                                    return SizedBox(
                                       height: 200,
                                       child: Padding(
-                                          padding: EdgeInsets.all(18.0),
+                                          padding: const EdgeInsets.all(18.0),
                                           child: Row(
                                             mainAxisAlignment:
                                                 MainAxisAlignment.spaceAround,
@@ -274,7 +315,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                                 icon: Column(
                                                   mainAxisSize:
                                                       MainAxisSize.min,
-                                                  children: [
+                                                  children: const [
                                                     Icon(
                                                       Icons.camera_alt_outlined,
                                                       size: 60,
@@ -292,7 +333,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                                 icon: Column(
                                                   mainAxisSize:
                                                       MainAxisSize.min,
-                                                  children: [
+                                                  children: const [
                                                     Icon(
                                                       Icons
                                                           .photo_library_outlined,
@@ -307,7 +348,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                     );
                                   });
                             },
-                          )),
+                          )
+                          ),
                       Text(
                         capitalize(cname),
                         style: const TextStyle(fontSize: 25),
@@ -368,7 +410,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     _cnameController.text = capitalize(cname);
                                     _phoneController.text = capitalize(mobile);
                                     return AlertDialog(
-                                      title: Text("Edit Location"),
+                                      title: const Text("Edit Location"),
                                       content: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         mainAxisAlignment:
@@ -382,15 +424,15 @@ class _MyHomePageState extends State<MyHomePage> {
                                                     BorderRadius.circular(
                                                         20),
                                                   ),
-                                                  label: Text("Name"),
-                                                  prefixIcon: Icon(Icons.person_outline)
+                                                  label: const Text("Name"),
+                                                  prefixIcon: const Icon(Icons.person_outline)
                                               ),
                                               keyboardType:
                                               TextInputType.name,
                                               controller: _cnameController,
                                             ),
                                           ),
-                                          SizedBox(
+                                          const SizedBox(
                                             height: 15,
                                           ),
                                           SizedBox(
@@ -401,15 +443,15 @@ class _MyHomePageState extends State<MyHomePage> {
                                                     BorderRadius.circular(
                                                         20),
                                                   ),
-                                                  label: Text("Phone"),
-                                                  prefixIcon: Icon(Icons.phone_outlined)
+                                                  label: const Text("Phone"),
+                                                  prefixIcon: const Icon(Icons.phone_outlined)
                                               ),
                                               keyboardType:
-                                              TextInputType.numberWithOptions(decimal: false),
+                                              const TextInputType.numberWithOptions(decimal: false),
                                               controller: _phoneController,
                                             ),
                                           ),
-                                          SizedBox(
+                                          const SizedBox(
                                             height: 15,
                                           ),
                                           SizedBox(
@@ -420,25 +462,25 @@ class _MyHomePageState extends State<MyHomePage> {
                                                         BorderRadius.circular(
                                                             20),
                                                   ),
-                                                  label: Text("Latitude"),
+                                                  label: const Text("Latitude"),
                                                   suffixIcon: IconButton(
                                                       onPressed: () async {
                                                         Position data = await Geolocator.getCurrentPosition();
-                                                        Duration(seconds: 1);
+                                                        const Duration(seconds: 1);
                                                         print(data.latitude);
                                                         setState(()  {
                                                           _latController.text = data.latitude.toString();
                                                         });
                                                       },
 
-                                                      icon: Icon(Icons
+                                                      icon: const Icon(Icons
                                                           .add_location_alt_outlined))),
                                               keyboardType:
                                                   TextInputType.number,
                                               controller: _latController,
                                             ),
                                           ),
-                                          SizedBox(
+                                          const SizedBox(
                                             height: 15,
                                           ),
                                           SizedBox(
@@ -449,17 +491,17 @@ class _MyHomePageState extends State<MyHomePage> {
                                                         BorderRadius.circular(
                                                             20),
                                                   ),
-                                                  label: Text("Longitude"),
+                                                  label: const Text("Longitude"),
                                                   suffixIcon: IconButton(
                                                       onPressed: () async {
                                                         Position data = await Geolocator.getCurrentPosition();
-                                                        Duration(seconds: 1);
+                                                        const Duration(seconds: 1);
                                                         print(data.longitude);
                                                         setState(()  {
                                                           _longController.text = data.longitude.toString();
                                                         });
                                                       },
-                                                      icon: Icon(Icons
+                                                      icon: const Icon(Icons
                                                           .add_location_alt_outlined))),
                                               keyboardType:
                                                   TextInputType.number,
@@ -473,11 +515,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                           onPressed: () {
                                             Navigator.of(context).pop();
                                           },
-                                          child: Text("Cancel"),
+                                          child: const Text("Cancel"),
                                         ),
                                         FilledButton(
                                           onPressed: () {
-                                            updateData(
+                                            updateDataCable(
                                                 GeoPoint(
                                                     double.parse(
                                                         _latController.text),
@@ -487,7 +529,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                             _cnameController.text,
                                             int.parse(_phoneController.text));
                                           },
-                                          child: Text("Save"),
+                                          child: const Text("Save"),
                                         ),
                                       ],
                                     );
@@ -510,7 +552,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          SizedBox(
+                          const SizedBox(
                             width: 10,
                           ),
                           SizedBox(
@@ -529,7 +571,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     width: double.infinity,
                                     padding: const EdgeInsets.only(
                                         left: 15, top: 15),
-                                    child: Text(
+                                    child: const Text(
                                       "Customer Info",
                                       style: TextStyle(
                                           fontSize: 18,
@@ -578,12 +620,12 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                             ),
                           ),
-                          SizedBox(
+                          const SizedBox(
                             width: 10,
                           )
                         ],
                       ),
-                      SizedBox(
+                      const SizedBox(
                         height: 10,
                       )
                     ],
@@ -597,13 +639,52 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  loadMarkerInternet() async {
+    // final String response = await rootBundle.loadString('assets/internet.json');
+    // final users = await json.decode(response);
+
+    final documentSnapshot = await FirebaseFirestore.instance.collection('internet').get(GetOptions(source: Source.serverAndCache));
+    var users = documentSnapshot.docs;
+    print(users.length);
+    setState(() {
+      _makerInternet = users.map((user){
+        String user_id = user['user_id'];
+        String name  = user['name'];
+        int phone = user['mobile'];
+        String status = user['status'];
+        String isp = user['isp'];
+        // uploadingDataInternet(user_id,name, phone, status, isp);
+        return Marker(
+          markerId: MarkerId(user_id),
+          position: LatLng(11.1728978, 75.9205007),
+          infoWindow:InfoWindow(
+            title: name.toString(),
+            snippet: phone.toString()
+          )
+        );
+      }).toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final ColorScheme colors = Theme.of(context).colorScheme;
     return Scaffold(
+      appBar: AppBar(
+        title: const Text("Search"),
+        centerTitle: true,
+        actions: [
+          IconButton(
+              onPressed: (){
+                showSearch(context: context, delegate: DataSearch());
+              },
+              icon: const Icon(Icons.search_rounded)
+          )
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _pageIndex,
-        destinations: [
+        destinations: const [
           NavigationDestination(
             icon: Icon(Icons.tv_outlined),
             label: "Cable",
@@ -624,95 +705,53 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       resizeToAvoidBottomInset: false,
       body: <Widget>[
-        Stack(
-          children: [
-            GoogleMap(
-              onMapCreated: _onMapCreated,
-              zoomControlsEnabled: false,
-              compassEnabled: true,
-              myLocationButtonEnabled: true,
-              mapType: MapType.normal,
-              trafficEnabled: true,
-              cameraTargetBounds: CameraTargetBounds(
-                  LatLngBounds(
-                      northeast: LatLng(11.199369, 75.934386), 
-                      southwest: LatLng(11.154130, 75.903564)
-                  )
-              ),
-              onTap: (lat){
-                if(_mobileNo=="Not Found"){
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Can't Fetch Number ")));
-                }
-                print(_mobileNo);
-                // print(initMobileNumberState().toString());
-              },
-              initialCameraPosition: CameraPosition(
-                target: currentPosition,
-                zoom: 13.0,
-              ),
-              markers: Set.of(_markers),
-            ),
-            Positioned(
-                top: 40,
-                left: 10,
-                right: 10,
-                child: Container(
-                    decoration: BoxDecoration(
-                        color: colors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(50)),
-                    child: TextField(
-                      controller: _crfController,
-                      decoration: const InputDecoration(
-                        suffixIcon: Icon(Icons.search_rounded),
-                        prefixIcon: Icon(Icons.person),
-                        hintText: "CRF",
-                        hintStyle: TextStyle(fontWeight: FontWeight.normal),
-                        contentPadding: EdgeInsets.only(left: 15, top: 11),
-                        border: InputBorder.none,
-                      ),
-                      onTap: (){
-                        showSearch(context: context, delegate: DataSearch());
-                      },
-                    ))),
-          ],
+        GoogleMap(
+          onMapCreated: _onMapCreated,
+          zoomControlsEnabled: false,
+          compassEnabled: true,
+          myLocationButtonEnabled: true,
+          mapType: MapType.normal,
+          trafficEnabled: true,
+          cameraTargetBounds: CameraTargetBounds(
+              LatLngBounds(
+                  northeast: const LatLng(11.199369, 75.934386),
+                  southwest: const LatLng(11.154130, 75.903564)
+              )
+          ),
+          onTap: (lat){
+            if(_mobileNo=="Not Found"){
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Can't Fetch Number ")));
+            }
+            print(_mobileNo);
+            // print(initMobileNumberState().toString());
+          },
+          initialCameraPosition: CameraPosition(
+            target: currentPosition,
+            zoom: 13.0,
+          ),
+          markers: Set.of(_markersCable),
         ),
-        Stack(
-          children: [
-            GoogleMap(
-              liteModeEnabled: true ,
-              mapToolbarEnabled: false,
-              myLocationEnabled: true,
-              onMapCreated: _onMapCreated,
-              zoomControlsEnabled: false,
-              compassEnabled: true,
-              myLocationButtonEnabled: true,
-              mapType: MapType.normal,
-              trafficEnabled: true,
-              initialCameraPosition: CameraPosition(
-                target: currentPosition,
-                zoom: 13.0,
-              ),
+        GoogleMap(
+          liteModeEnabled: true ,
+          mapToolbarEnabled: false,
+          myLocationEnabled: true,
+          onMapCreated: _onMapCreated,
+          zoomControlsEnabled: false,
+          compassEnabled: true,
+          myLocationButtonEnabled: true,
+          mapType: MapType.satellite,
+          // markers: Set.of(_makerInternet),
+          markers:  {
+            Marker(
+                markerId: MarkerId("my_location"),
+                position: LatLng(lat, long)
             ),
-            Positioned(
-                top: 40,
-                left: 10,
-                right: 10,
-                child: Container(
-                    decoration: BoxDecoration(
-                        color: colors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(50)),
-                    child: TextField(
-                      controller: _crfController,
-                      decoration: const InputDecoration(
-                        suffixIcon: Icon(Icons.search_rounded),
-                        prefixIcon: Icon(Icons.person),
-                        hintText: "CRF",
-                        hintStyle: TextStyle(fontWeight: FontWeight.normal),
-                        contentPadding: EdgeInsets.only(left: 15, top: 11),
-                        border: InputBorder.none,
-                      ),
-                    ))),
-          ],
+          },
+          trafficEnabled: true,
+          initialCameraPosition: CameraPosition(
+            target: currentPosition,
+            zoom: 13.0,
+          ),
         ),
       ][_pageIndex],
       floatingActionButton: FloatingActionButton(
@@ -720,6 +759,7 @@ class _MyHomePageState extends State<MyHomePage> {
           Icons.my_location,
         ),
         onPressed: () {
+          // loadMarkerInternet();
           // uploadingData("Name","200",true, "SA", 99948, GeoPoint(1, 2));
         },
       ),
@@ -734,7 +774,11 @@ class DataSearch extends SearchDelegate<String>{
           onPressed: (){
             query = "";
           },
-          icon: Icon(Icons.clear))
+          icon: AnimatedIcon(
+            icon:AnimatedIcons.menu_close,
+            progress: transitionAnimation,
+          )
+      )
     ];
   }
 
@@ -760,13 +804,7 @@ class DataSearch extends SearchDelegate<String>{
   @override
   Widget buildSuggestions(BuildContext context) {
     final suggestionList = query;
-    return ListView.builder(
-      itemCount: 1,
-        itemBuilder: (context, index){
-      ListTile(
-        title: Text("hu"),
-      );
-    });
+    return Text("assa");
   }
    
 }
