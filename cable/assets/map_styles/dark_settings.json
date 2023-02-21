@@ -213,22 +213,6 @@
     ]
   },
   {
-    "featureType": "transit.station.airport",
-    "stylers": [
-      {
-        "visibility": "off"
-      }
-    ]
-  },
-  {
-    "featureType": "transit.station.rail",
-    "stylers": [
-      {
-        "visibility": "off"
-      }
-    ]
-  },
-  {
     "featureType": "water",
     "elementType": "geometry",
     "stylers": [

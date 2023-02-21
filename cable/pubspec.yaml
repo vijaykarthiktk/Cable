@@ -48,6 +48,7 @@ dependencies:
   platform: ^3.1.0
   searchable_listview: ^2.2.1
   cached_network_image: ^3.2.3
+  firebase_storage: ^11.0.14
 
 dev_dependencies:
   flutter_test:
@@ -76,6 +77,7 @@ flutter:
     - assets/location.json
     - assets/green.png
     - assets/internet.json
+    - assets/map_styles/dark_settings.json
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:searchable_listview/searchable_listview.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:system_theme/system_theme.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -71,6 +72,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   String crf = 'K10E0180013';
 
+  late String _darkMapStyle;
+
   LatLng currentPosition = const LatLng(11.1795878, 75.9271907);
 
   late String _mobileNo;
@@ -78,8 +81,6 @@ class _MyHomePageState extends State<MyHomePage> {
   List<String> _cnameCable = [];
   List<String> _crfCable = [];
   List<String> _phoneCable = [];
-
-
 
   double lat = 0;
   double long = 0;
@@ -91,6 +92,7 @@ class _MyHomePageState extends State<MyHomePage> {
     Geolocator.requestPermission();
     Geolocator.getCurrentPosition();
     getCurrentLocation();
+    _loadMapStyle();
     MobileNumber.listenPhonePermission((isPermissionGranted) {
       if (isPermissionGranted) {
         initMobileNumberState();
@@ -101,6 +103,10 @@ class _MyHomePageState extends State<MyHomePage> {
       loadMarkersCable();
       // loadMarkerInternet();
     });
+  }
+
+  Future _loadMapStyle() async {
+    _darkMapStyle  = await rootBundle.loadString('assets/map_styles/dark_settings.json');
   }
 
   initMobileNumberState() async {
@@ -138,7 +144,6 @@ class _MyHomePageState extends State<MyHomePage> {
   _onMapCreated(GoogleMapController controller) {
     _googleMapController = controller;
     getCurrentLocation();
-
   }
 
   uploadingDataCable(String crf, String chipID, bool status, cname, int mobile, GeoPoint cords) async {
@@ -699,45 +704,46 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       resizeToAvoidBottomInset: false,
       body: <Widget>[
+        Stack(
+          children: [
+            GoogleMap(
+              onMapCreated: _onMapCreated,
+              minMaxZoomPreference: MinMaxZoomPreference(14,20),
+              zoomControlsEnabled: false,
+              compassEnabled: true,
+              mapType: MapType.normal,
+              indoorViewEnabled: true,
+              cameraTargetBounds: CameraTargetBounds(LatLngBounds(
+                  northeast: const LatLng(11.199369, 75.934386),
+                  southwest: const LatLng(11.154130, 75.903564))),
+              initialCameraPosition: CameraPosition(
+                target: currentPosition,
+                zoom: 13.0,
+              ),
+              markers: Set.of(_markersCable),
+            ),
+          ],
+        ),
         GoogleMap(
+          liteModeEnabled: true,
+          mapToolbarEnabled: false,
+          myLocationEnabled: true,
           onMapCreated: _onMapCreated,
-          minMaxZoomPreference: MinMaxZoomPreference(14,15),
           zoomControlsEnabled: false,
           compassEnabled: true,
-          myLocationEnabled: true,
           myLocationButtonEnabled: true,
-          mapType: MapType.normal,
+          mapType: MapType.satellite,
+          markers: Set.of(_makerInternet),
+          // markers: {
+          //   Marker(
+          //       markerId: MarkerId("my_location"), position: LatLng(lat, long)),
+          // },
           trafficEnabled: true,
-          cameraTargetBounds: CameraTargetBounds(LatLngBounds(
-              northeast: const LatLng(11.199369, 75.934386),
-              southwest: const LatLng(11.154130, 75.903564))),
           initialCameraPosition: CameraPosition(
             target: currentPosition,
             zoom: 13.0,
           ),
-          markers: Set.of(_markersCable),
         ),
-        // GoogleMap(
-        //   liteModeEnabled: true,
-        //   mapToolbarEnabled: false,
-        //   myLocationEnabled: true,
-        //   onMapCreated: _onMapCreated,
-        //   zoomControlsEnabled: false,
-        //   compassEnabled: true,
-        //   myLocationButtonEnabled: true,
-        //   mapType: MapType.satellite,
-        //   // markers: Set.of(_makerInternet),
-        //   markers: {
-        //     Marker(
-        //         markerId: MarkerId("my_location"), position: LatLng(lat, long)),
-        //   },
-        //   trafficEnabled: true,
-        //   initialCameraPosition: CameraPosition(
-        //     target: currentPosition,
-        //     zoom: 13.0,
-        //   ),
-        // ),
-        Center(child:Text("Not"),)
       ][_pageIndex],
       floatingActionButton: FloatingActionButton(
         child: const Icon(
