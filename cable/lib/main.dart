@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:cable/service/storage_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -210,37 +211,22 @@ class _MyHomePageState extends State<MyHomePage> {
         XFile? image;
 
         final ImagePicker _picker = ImagePicker();
-        Future<String> uploadImage(String base_data, String _crf) async {
-          String url =
-              "http://spbhss.live/upload/?basedata=$base_data=&crf=$crf";
-          var response = await http.get(Uri.parse(url));
-
-          if (response.statusCode == 200) {
-            var posts = jsonDecode(response.body) as List;
-            print(posts);
-          } else {
-            print('Request failed with status code: ${response.statusCode}');
-          }
-          return "http://spbhss.live/upload/?id=$crf.png";
-        }
-
-        Future<String> convertFileToBase64(String filePath, String crf) async {
-          File file = File(filePath);
-          List<int> bytes = await file.readAsBytes();
-          print(base64Encode(bytes));
-          return uploadImage(base64Encode(bytes).toString(), crf);
-        }
 
         void getImagePath(ImageSource source, String crf) async {
           image = await _picker.pickImage(
             source: source,
             preferredCameraDevice: CameraDevice.rear,
           );
-          setState(() {
-            String base_data = convertFileToBase64(image!.path, crf).toString();
-
-            // print(base_data);
-          });
+          if(image == null){
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No Image Selectec")));
+          } else{
+            final filePath = image?.path;
+            final fileName = '$crf.png';
+            final Storage storage = Storage();
+            storage.uploadFile(fileName, filePath!).then((value){
+              print('done');
+            });
+          }
         }
         try{
           var date_time = user['date_time'];
