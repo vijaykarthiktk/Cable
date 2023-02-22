@@ -49,6 +49,7 @@ dependencies:
   searchable_listview: ^2.2.1
   cached_network_image: ^3.2.3
   firebase_storage: ^11.0.14
+  cached_firestorage: ^0.1.6
 
 dev_dependencies:
   flutter_test:

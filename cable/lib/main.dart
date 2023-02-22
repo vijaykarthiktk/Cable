@@ -1,15 +1,11 @@
-import 'dart:convert';
 
 import 'package:cable/service/storage_service.dart';
+import 'package:cached_firestorage/cached_firestorage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:searchable_listview/searchable_listview.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:system_theme/system_theme.dart';
-import 'dart:io';
-import 'package:http/http.dart' as http;
 import 'package:mobile_number/mobile_number.dart';
 
 import 'package:flutter/material.dart';
@@ -69,11 +65,8 @@ class _MyHomePageState extends State<MyHomePage> {
   List<Marker> _markersCable = [];
   List<Marker> _makerInternet = [];
 
-  late GoogleMapController _googleMapController;
-
   String crf = 'K10E0180013';
 
-  late String _darkMapStyle;
 
   LatLng currentPosition = const LatLng(11.1795878, 75.9271907);
 
@@ -93,7 +86,6 @@ class _MyHomePageState extends State<MyHomePage> {
     Geolocator.requestPermission();
     Geolocator.getCurrentPosition();
     getCurrentLocation();
-    _loadMapStyle();
     MobileNumber.listenPhonePermission((isPermissionGranted) {
       if (isPermissionGranted) {
         initMobileNumberState();
@@ -104,10 +96,6 @@ class _MyHomePageState extends State<MyHomePage> {
       loadMarkersCable();
       // loadMarkerInternet();
     });
-  }
-
-  Future _loadMapStyle() async {
-    _darkMapStyle  = await rootBundle.loadString('assets/map_styles/dark_settings.json');
   }
 
   initMobileNumberState() async {
@@ -139,11 +127,9 @@ class _MyHomePageState extends State<MyHomePage> {
       lat = location.latitude;
       long = location.longitude;
     });
-    print(lat);
   }
 
   _onMapCreated(GoogleMapController controller) {
-    _googleMapController = controller;
     getCurrentLocation();
   }
 
@@ -182,7 +168,6 @@ class _MyHomePageState extends State<MyHomePage> {
               "${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year} ${DateTime.now().hour % 12}:${DateTime.now().minute}"
           // "date_time":DateFormat.jm().format(DateTime.now())
         }).whenComplete(() {
-          // print(querySnapshot.docs.asMap()['cname']);
         });
       });
     });
@@ -216,18 +201,21 @@ class _MyHomePageState extends State<MyHomePage> {
           image = await _picker.pickImage(
             source: source,
             preferredCameraDevice: CameraDevice.rear,
+            requestFullMetadata: true,
+            imageQuality: 90
           );
           if(image == null){
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No Image Selectec")));
           } else{
             final filePath = image?.path;
-            final fileName = '$crf.png';
+            final fileName = '$crf.jpg';
             final Storage storage = Storage();
-            storage.uploadFile(fileName, filePath!).then((value){
-              print('done');
+            storage.uploadFileCable(fileName, filePath!).then((value){
+              print(value);
             });
           }
         }
+
         try{
           var date_time = user['date_time'];
           return Marker(
@@ -251,19 +239,33 @@ class _MyHomePageState extends State<MyHomePage> {
                               height: 20,
                             ),
                             SizedBox(
-                                width: 200,
-                                height: 150,
+                                width: 120,
+                                height: 160,
                                 child: GestureDetector(
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(10),
-                                    child: Image.network(
-                                      getImage(crf),
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return const Icon(
-                                          Icons.no_photography_outlined,
-                                          size: 50,
-                                        );
-                                      },
+                                    child: FutureBuilder(
+                                      future: CachedFirestorage.instance.getDownloadURL(mapKey: '10', filePath: 'cable/$crf.png',),
+                                      builder:(_ ,snapshot){
+                                        print(crf);
+                                        if(snapshot.connectionState == ConnectionState.done){
+                                          return ClipRRect(
+                                            borderRadius: BorderRadius.circular(10),
+                                            child: Image.network(
+                                              snapshot.data!,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                print(error);
+                                                return const Icon(
+                                                  Icons.no_photography_outlined,
+                                                  size: 50,
+                                                );
+                                              },
+                                            ),
+                                          );
+                                        } else {
+                                          return Center(child: CircularProgressIndicator());
+                                        }
+                                      }
                                     ),
                                   ),
                                   onTap: () {
@@ -320,7 +322,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                           );
                                         });
                                   },
-                                )),
+                                )
+                            ),
                             Text(
                               capitalize(cname),
                               style: const TextStyle(fontSize: 25),
@@ -981,7 +984,6 @@ class DataSearch extends SearchDelegate<String>{
 
   @override
   Widget buildSuggestions(BuildContext buildContext) {
-    final suggestionList = query;
     return FutureBuilder(
         future:  FirebaseFirestore.instance.collection('marker').get(const GetOptions(source: Source.cache)),
         builder: ((context, snapshot){
@@ -1008,14 +1010,31 @@ class DataSearch extends SearchDelegate<String>{
         users[index]['mobile'].toString().toLowerCase().contains(query.toLowerCase())){
       return ListTile(
         title: Text(capitalize(users[index]['cname'])),
-        // leading: Icon(Icons.person, size: 50,),
-        // leading: getImage(users[index]['crf']),
-        leading: Image.network(
-          getImage(users[index]['crf']),
-          scale: 4,
-          errorBuilder: (context, object, stacktrace){
-          return Icon(Icons.person, size: 50,);
-        },),
+        leading: SizedBox(
+          width: 75,
+          height: 100,
+          child: FutureBuilder(
+              future: CachedFirestorage.instance.getDownloadURL(mapKey: users[index]['crf'], filePath: 'cable/${users[index]['crf'].toString()}.jpg',),
+              builder:(_ ,snapshot){
+                if(snapshot.connectionState == ConnectionState.done){
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      snapshot.data!,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.person,
+                          size: 50,
+                        );
+                      },
+                    ),
+                  );
+                } else {
+                  return Center(child: CircularProgressIndicator());
+                }
+              }
+          ),
+        ),
         subtitle: Text('${users[index]['crf']}\n${users[index]['mobile']}', style: TextStyle(fontWeight: FontWeight.w100),),
         isThreeLine: true,
         onTap: (){

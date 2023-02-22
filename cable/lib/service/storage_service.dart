@@ -1,18 +1,20 @@
 import 'dart:io';
 
-import 'package:firebase_core/firebase_core.dart' as firebase_core;
+import 'package:cached_firestorage/cached_firestorage.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 class Storage{
   final FirebaseStorage storage = FirebaseStorage.instance;
-  uploadFile(String fileName, String filePath) async {
+  final CachedFirestorage cacheStorage = CachedFirestorage.instance;
+  uploadFileCable(String fileName, String filePath) async {
     File file = File(filePath);
     try{
-      await storage.ref('test/$fileName').putFile(file);
+      await storage.ref('cable/$fileName').putFile(file);
     } on FirebaseException catch (e){
       if (kDebugMode) {
         print(e);
       }
     }
   }
+
 }

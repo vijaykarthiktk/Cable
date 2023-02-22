@@ -9,6 +9,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.16"
+  adaptive_spinner:
+    dependency: transitive
+    description:
+      name: adaptive_spinner
+      sha256: db4dfd3289becf90af27a374bcfb4edac61fdfedf7b11fea175ae6925e6cd34a
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.0"
   async:
     dependency: transitive
     description:
@@ -17,6 +25,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.10.0"
+  avatar_view:
+    dependency: transitive
+    description:
+      name: avatar_view
+      sha256: "5794a7dee2c56ebc9c938f6d506b7bfd000d1986caef1a67a50dd62fe87f4098"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1"
   boolean_selector:
     dependency: transitive
     description:
@@ -25,6 +41,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.1"
+  cached_firestorage:
+    dependency: "direct main"
+    description:
+      name: cached_firestorage
+      sha256: "637fabbc685cbbf9c6e71bd06b5cc62b826a29583120c6c65c2e641b1d9cdd6d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.6"
   cached_network_image:
     dependency: "direct main"
     description:
@@ -238,6 +262,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.7"
+  flutter_spinkit:
+    dependency: transitive
+    description:
+      name: flutter_spinkit
+      sha256: "77a2117c0517ff909221f3160b8eb20052ab5216107581168af574ac1f05dff8"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.1.0"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -296,6 +328,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.1.1"
+  get:
+    dependency: transitive
+    description:
+      name: get
+      sha256: "2ba20a47c8f1f233bed775ba2dd0d3ac97b4cf32fc17731b3dfc672b06b0e92a"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.6.5"
+  get_storage:
+    dependency: transitive
+    description:
+      name: get_storage
+      sha256: "00b3908d9cd4138738b4db69bcc0fc1cf4ee8570c06594136569470f32a84207"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.3"
   google_maps_flutter:
     dependency: "direct main"
     description:
