@@ -50,6 +50,7 @@ dependencies:
   cached_network_image: ^3.2.3
   firebase_storage: ^11.0.14
   cached_firestorage: ^0.1.6
+  flutter_barcode_scanner: ^2.0.0
 
 dev_dependencies:
   flutter_test:
