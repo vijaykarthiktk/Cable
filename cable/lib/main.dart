@@ -4,6 +4,7 @@ import 'package:cached_firestorage/cached_firestorage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:system_theme/system_theme.dart';
 import 'package:mobile_number/mobile_number.dart';
@@ -54,11 +55,19 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final TextEditingController _crfController = TextEditingController();
   final TextEditingController _latController = TextEditingController();
   final TextEditingController _longController = TextEditingController();
+
+  final TextEditingController _crfController = TextEditingController();
   final TextEditingController _cnameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _chipIdController = TextEditingController();
+  final TextEditingController _phoneCableController = TextEditingController();
+
+  final TextEditingController _ispController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _userIDController = TextEditingController();
+  final TextEditingController _macController = TextEditingController();
+  final TextEditingController _phoneInternetController = TextEditingController();
 
   int _pageIndex = 0;
 
@@ -76,8 +85,10 @@ class _MyHomePageState extends State<MyHomePage> {
   List<String> _crfCable = [];
   List<String> _phoneCable = [];
 
-  double lat = 0;
-  double long = 0;
+  List<String> _nameInternet = [];
+  List<String> _userIDInternt = [];
+  List<String> _phoneInternt = [];
+
 
   @override
   initState() {
@@ -94,7 +105,7 @@ class _MyHomePageState extends State<MyHomePage> {
     initMobileNumberState();
     Firebase.initializeApp().whenComplete(() {
       loadMarkersCable();
-      // loadMarkerInternet();
+      loadMarkerInternet();
     });
   }
 
@@ -133,7 +144,7 @@ class _MyHomePageState extends State<MyHomePage> {
     getCurrentLocation();
   }
 
-  uploadingDataCable(String crf, String chipID, bool status, cname, int mobile, GeoPoint cords) async {
+  createDataCable(String crf, String chipID, bool status, cname, int mobile, GeoPoint cords) async {
     await FirebaseFirestore.instance.collection("marker").doc("crf").set({
       'chipid': chipID,
       'status': status,
@@ -143,33 +154,18 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  uploadingDataInternet(String userID, String name, int phone, String status, String isp) async {
+  createDataInternet(String userID, String name, int phone, String isp, String mac, GeoPoint location) async {
+    var mobile = await MobileNumber.mobileNumber ?? "";
+    mobile = mobile.toString().substring(2, mobile.length);
     await FirebaseFirestore.instance.collection("internet").add({
       'user_id': userID,
       'name': capitalize(name),
       'mobile': phone,
-      'status': status.toUpperCase(),
-      'isp': isp.toUpperCase()
-    });
-  }
-
-  updateDataInternet(GeoPoint cords, String crf, String name, int phone) async {
-    await FirebaseFirestore.instance
-        .collection('marker')
-        .where('crf', isEqualTo: crf)
-        .get()
-        .then((querySnapshot) {
-      querySnapshot.docs.forEach((element) {
-        element.reference.update({
-          'cords': cords,
-          'cname': name,
-          'mobile': phone,
-          'date_time':
-              "${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year} ${DateTime.now().hour % 12}:${DateTime.now().minute}"
-          // "date_time":DateFormat.jm().format(DateTime.now())
-        }).whenComplete(() {
-        });
-      });
+      'isp': isp.toUpperCase(),
+      'mac':mac,
+      'cords': location,
+      'updated_by': mobile,
+      'date_time': "${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year} ${DateTime.now().hour % 12}:${DateTime.now().minute}"
     });
   }
 
@@ -382,7 +378,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                           _latController.text = lat.toString();
                                           _longController.text = long.toString();
                                           _cnameController.text = capitalize(cname);
-                                          _phoneController.text = capitalize(mobile);
+                                          _phoneCableController.text = capitalize(mobile);
                                           return AlertDialog(
                                             title: const Text("Edit Location"),
                                             content: Column(
@@ -422,7 +418,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                                     keyboardType: const TextInputType
                                                         .numberWithOptions(
                                                         decimal: false),
-                                                    controller: _phoneController,
+                                                    controller: _phoneCableController,
                                                   ),
                                                 ),
                                                 const SizedBox(
@@ -512,7 +508,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                                       crf,
                                                       _cnameController.text,
                                                       int.parse(
-                                                          _phoneController.text));
+                                                          _phoneCableController.text));
                                                 },
                                                 child: const Text("Save"),
                                               ),
@@ -637,7 +633,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     final documentSnapshot = await FirebaseFirestore.instance
         .collection('internet')
-        .get(GetOptions(source: Source.serverAndCache));
+        .get(GetOptions(source: Source.cache));
     var users = documentSnapshot.docs;
     setState(() {
       _makerInternet = users.map((user) {
@@ -646,12 +642,31 @@ class _MyHomePageState extends State<MyHomePage> {
         int phone = user['mobile'];
         String status = user['status'];
         String isp = user['isp'];
+        _nameInternet.add(name);
+        _phoneInternt.add(phone.toString());
+        _userIDInternt.add(user_id);
+        try{
+          String date_time = user['date_time'];
+          String mac = user['mac'];
+        }catch(e){
+          if(kDebugMode){
+            print(e);
+          }
+        }
         // uploadingDataInternet(user_id,name, phone, status, isp);
-        return Marker(
-            markerId: MarkerId(user_id),
-            position: LatLng(11.1728978, 75.9205007),
-            infoWindow:
-                InfoWindow(title: name.toString(), snippet: phone.toString()));
+        try{
+          GeoPoint location = user['cords'];
+          return Marker(
+              markerId: MarkerId(user_id),
+              position: LatLng(location.longitude, location.latitude),
+              infoWindow: InfoWindow(title: name.toString(), snippet: phone.toString()));
+        }catch (e){
+          return Marker(
+              markerId: MarkerId(user_id),
+              position: LatLng(11.1728978, 75.9205007),
+              infoWindow:
+              InfoWindow(title: name.toString(), snippet: phone.toString()));
+        }
       }).toList();
     });
   }
@@ -665,7 +680,13 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text("Search"),
         actions: [
           IconButton(
-              onPressed: (){showSearch(context: context, delegate: DataSearch());},
+              onPressed: (){
+                if(_pageIndex == 0){
+                  showSearch(context: context, delegate: DataSearchCable());
+                } else{
+                  showSearch(context: context, delegate: DataSearchInternet());
+                }
+                },
               icon: Icon(Icons.search_rounded)
           )
         ],
@@ -693,15 +714,12 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       resizeToAvoidBottomInset: false,
       body: <Widget>[
-        Stack(
-          children: [
-            GoogleMap(
+        GoogleMap(
               onMapCreated: _onMapCreated,
               minMaxZoomPreference: MinMaxZoomPreference(14,20),
               zoomControlsEnabled: false,
               compassEnabled: true,
               mapType: MapType.normal,
-              indoorViewEnabled: true,
               cameraTargetBounds: CameraTargetBounds(LatLngBounds(
                   northeast: const LatLng(11.199369, 75.934386),
                   southwest: const LatLng(11.154130, 75.903564))),
@@ -711,17 +729,17 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
               markers: Set.of(_markersCable),
             ),
-          ],
-        ),
         GoogleMap(
+          cameraTargetBounds: CameraTargetBounds(LatLngBounds(
+              northeast: const LatLng(11.199369, 75.934386),
+              southwest: const LatLng(11.154130, 75.903564))),
+          minMaxZoomPreference: MinMaxZoomPreference(14,20),
           liteModeEnabled: true,
           mapToolbarEnabled: false,
           myLocationEnabled: true,
           onMapCreated: _onMapCreated,
-          zoomControlsEnabled: false,
           compassEnabled: true,
           myLocationButtonEnabled: true,
-          mapType: MapType.satellite,
           markers: Set.of(_makerInternet),
           // markers: {
           //   Marker(
@@ -741,16 +759,16 @@ class _MyHomePageState extends State<MyHomePage> {
         onPressed: () {
           // loadMarkerInternet();
           // uploadingData("Name","200",true, "SA", 99948, GeoPoint(1, 2));
-          if(lat == 0.0 || lat != 0.0){
-            print("$lat $long");
+          if(_pageIndex == 0 ){
               showDialog(
                   context: context,
                   builder: (BuildContext context) {
                     _latController.text = lat.toString();
                     _longController.text = long.toString();
                     _cnameController.text = "";
-                    _phoneController.text = "";
+                    _phoneCableController.text = "";
                     _crfController.text = "";
+                    _chipIdController.text = "";
                     return AlertDialog(
                       title: const Text("Edit Location"),
                       content: SingleChildScrollView(
@@ -759,40 +777,40 @@ class _MyHomePageState extends State<MyHomePage> {
                           mainAxisAlignment:
                           MainAxisAlignment.start,
                           children: [
-                            SizedBox(height: 10,),
                             SizedBox(
-                              child: TextField(
-                                decoration: InputDecoration(
-                                    border: OutlineInputBorder(
-                                      borderRadius:
-                                      BorderRadius.circular(
-                                          20),
-                                    ),
-                                    label: const Text("CRF"),
-                                    prefixIcon: const Icon(
-                                        Icons.dns_outlined,)),
-                                keyboardType: TextInputType.name,
-                                controller: _crfController,
-                              ),
+                            child: TextField(
+                              decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                        20),
+                                  ),
+                                  label: const Text("CRF"),
+                                  prefixIcon: const Icon(
+                                    Icons.dns_outlined,)),
+                              keyboardType: TextInputType.name,
+                              controller: _crfController,
                             ),
-                            SizedBox(
-                              child: TextField(
-                                decoration: InputDecoration(
-                                    border: OutlineInputBorder(
-                                      borderRadius:
-                                      BorderRadius.circular(
-                                          20),
-                                    ),
-                                    label: const Text("CRF"),
-                                    prefixIcon: const Icon(
-                                      Icons.dns_outlined,)),
-                                keyboardType: TextInputType.name,
-                                controller: _crfController,
-                              ),
-                            ),
-
+                          ),
                             const SizedBox(
-                              height: 15,
+                              height: 10,),
+                            SizedBox(
+                              child: TextField(
+                                decoration: InputDecoration(
+                                    border: OutlineInputBorder(
+                                      borderRadius:
+                                      BorderRadius.circular(
+                                          20),
+                                    ),
+                                    label: const Text("Chip ID"),
+                                    prefixIcon: const Icon(
+                                      Icons.manage_accounts_outlined,)),
+                                keyboardType: TextInputType.name,
+                                controller: _chipIdController,
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 10,
                             ),
                             SizedBox(
                               child: TextField(
@@ -807,10 +825,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                         Icons.person_outline)),
                                 keyboardType: TextInputType.name,
                                 controller: _cnameController,
+                                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z ]'))],
                               ),
                             ),
                             const SizedBox(
-                              height: 15,
+                              height: 10,
                             ),
                             SizedBox(
                               child: TextField(
@@ -823,14 +842,16 @@ class _MyHomePageState extends State<MyHomePage> {
                                     label: const Text("Phone"),
                                     prefixIcon: const Icon(
                                         Icons.phone_outlined)),
-                                keyboardType: const TextInputType
-                                    .numberWithOptions(
-                                    decimal: false),
-                                controller: _phoneController,
+                                keyboardType: TextInputType.phone,
+                                inputFormatters: [
+                                  LengthLimitingTextInputFormatter(10),
+                                  FilteringTextInputFormatter.digitsOnly
+                                ],
+                                controller: _phoneCableController,
                               ),
                             ),
                             const SizedBox(
-                              height: 15,
+                              height: 10,
                             ),
                             SizedBox(
                               child: TextField(
@@ -849,7 +870,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                             ),
                             const SizedBox(
-                              height: 15,
+                              height: 10,
                             ),
                             SizedBox(
                               child: TextField(
@@ -887,15 +908,183 @@ class _MyHomePageState extends State<MyHomePage> {
                                 crf,
                                 _cnameController.text,
                                 int.parse(
-                                    _phoneController.text));
+                                    _phoneCableController.text));
                           },
                           child: const Text("Save"),
                         ),
                       ],
                     );
                   });
-
-          } else{
+          }
+          else if(_pageIndex ==1){
+            showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  _latController.text = lat.toString();
+                  _longController.text = long.toString();
+                  _nameController.text = "";
+                  _phoneInternetController.text = "";
+                  _userIDController.text = "";
+                  _ispController.text = "";
+                  _macController.text = "";
+                  return AlertDialog(
+                    title: const Text("Edit Location"),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment:
+                        MainAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            child: TextField(
+                              decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                        20),
+                                  ),
+                                  label: const Text("User ID"),
+                                  prefixIcon: const Icon(
+                                    Icons.manage_accounts_outlined,)),
+                              keyboardType: TextInputType.name,
+                              controller: _userIDController,
+                            ),
+                          ),//User ID
+                          const SizedBox(
+                            height: 10,),
+                          SizedBox(
+                            child: TextField(
+                              decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                        20),
+                                  ),
+                                  label: const Text("Name"),
+                                  prefixIcon: const Icon(
+                                    Icons.person_outline,)),
+                              keyboardType: TextInputType.name,
+                              controller: _chipIdController,
+                            ),
+                          ),//Name
+                          const SizedBox(
+                            height: 10,
+                          ),
+                          SizedBox(
+                            child: TextField(
+                              decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                        20),
+                                  ),
+                                  label: const Text("Phone"),
+                                  prefixIcon: const Icon(
+                                      Icons.phone_outlined)),
+                              keyboardType: TextInputType.phone,
+                              controller: _phoneInternetController,
+                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9]'))],
+                            ),
+                          ),//Phone
+                          const SizedBox(
+                            height: 10,
+                          ),
+                          SizedBox(
+                            child: TextField(
+                              decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                        20),
+                                  ),
+                                  label: const Text("ISP"),
+                                  prefixIcon: const Icon(
+                                      Icons.dns_outlined)),
+                              keyboardType: TextInputType.name,
+                              controller: _cnameController,
+                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z ]'))],
+                            ),
+                          ),//ISP
+                          const SizedBox(
+                            height: 10,
+                          ),
+                          SizedBox(
+                            child: TextField(
+                              decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                        20),
+                                  ),
+                                  label: const Text("MAC"),
+                                  prefixIcon: const Icon(
+                                      Icons.wifi_password_outlined)),
+                              textCapitalization:TextCapitalization.characters,
+                              inputFormatters: [
+                                LengthLimitingTextInputFormatter(12),
+                                FilteringTextInputFormatter.allow(RegExp(r'[0-9A-F]'))
+                              ],
+                              controller: _macController,
+                            ),
+                          ),//MAC
+                          const SizedBox(
+                            height: 10,
+                          ),
+                          SizedBox(
+                            child: TextField(
+                              enabled: false,
+                              decoration: InputDecoration(
+                                border: OutlineInputBorder(
+                                  borderRadius:
+                                  BorderRadius.circular(
+                                      20),
+                                ),
+                                label: const Text("Latitude"),
+                              ),
+                              keyboardType:
+                              TextInputType.number,
+                              controller: _latController,
+                            ),
+                          ),//Latitude
+                          const SizedBox(
+                            height: 10,
+                          ),
+                          SizedBox(
+                            child: TextField(
+                              enabled: false,
+                              decoration: InputDecoration(
+                                border: OutlineInputBorder(
+                                  borderRadius:
+                                  BorderRadius.circular(
+                                      20),
+                                ),
+                                label:
+                                const Text("Longitude"),),
+                              keyboardType: TextInputType.number,
+                              controller: _longController,
+                            ),
+                          ),//Longitude
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      OutlinedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text("Cancel"),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          // createDataInternet(_userIDController.text, _nameController.text, _phoneInternetController.text.toString(), isp, mac, location);
+                        },
+                        child: const Text("Save"),
+                      ),
+                    ],
+                  );
+                });
+          }
+          else{
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Please Wait")));
           }
         },
@@ -904,6 +1093,8 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
+double lat = 0;
+double long = 0;
 updateDataCable(GeoPoint cords, String crf, String name, int phone) async {
   var mobile = await MobileNumber.mobileNumber ?? "";
   mobile = mobile.toString().substring(2, mobile.length);
@@ -915,13 +1106,37 @@ updateDataCable(GeoPoint cords, String crf, String name, int phone) async {
     querySnapshot.docs.forEach((element) {
       element.reference.update({
         'cords': cords,
-        'cname': name,
+        'cname': name.trim(),
         'mobile': phone,
         'date_time': "${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year} ${DateTime.now().hour % 12}:${DateTime.now().minute}",
         'updated_by': mobile
         // "date_time":DateFormat.jm().format(DateTime.now())
       }).whenComplete(() {
         // print(querySnapshot.docs.asMap()['cname']);
+      });
+    });
+  });
+}
+
+updateDateInternet(GeoPoint cords, String userID, String name, int phone, String isp, String mac) async {
+  var mobile = await MobileNumber.mobileNumber ?? "";
+  mobile = mobile.toString().substring(2, mobile.length);
+  await FirebaseFirestore.instance
+      .collection('internet')
+      .where('user_id', isEqualTo: userID)
+      .get()
+      .then((querySnapshot) {
+    querySnapshot.docs.forEach((element) {
+      element.reference.update({
+        'cords': cords,
+        'name': name,
+        'mobile': phone,
+        'mac': mac,
+        'isp': isp,
+        'updated_by':mobile,
+        'date_time': "${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year} ${DateTime.now().hour % 12}:${DateTime.now().minute}"
+        // "date_time":DateFormat.jm().format(DateTime.now())
+      }).whenComplete(() {
       });
     });
   });
@@ -945,7 +1160,7 @@ String capitalize(String s) {
   return returnName.trim();
 }
 
-class DataSearch extends SearchDelegate<String>{
+class DataSearchCable extends SearchDelegate<String>{
   final TextEditingController _crfController = TextEditingController();
   final TextEditingController _latController = TextEditingController();
   final TextEditingController _longController = TextEditingController();
@@ -1042,7 +1257,6 @@ class DataSearch extends SearchDelegate<String>{
           double long = (users[index]['cords'] as GeoPoint).longitude;
           String crf = users[index]['crf'].toString();
           String cname = users[index]['cname'];
-          bool status = users[index]['status'];
           String mobile = users[index]['mobile'].toString();
           Navigator.of(context).pop();
           showDialog(context: context, builder: (BuildContext context){
@@ -1208,4 +1422,321 @@ class DataSearch extends SearchDelegate<String>{
     }
   }
 
+}
+
+class DataSearchInternet extends SearchDelegate<String>{
+  bool _isUdyami = false;
+
+  final TextEditingController _latController = TextEditingController();
+  final TextEditingController _longController = TextEditingController();
+
+  final TextEditingController _ispController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _userIDController = TextEditingController();
+  final TextEditingController _macController = TextEditingController();
+  final TextEditingController _phoneInternetController = TextEditingController();
+  final ValueNotifier<bool> _checkboxValueNotifier = ValueNotifier<bool>(false);
+
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return[
+      IconButton(
+          onPressed: (){
+            query = "";
+          },
+          icon: Icon(Icons.clear))
+    ];
+  }
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+        onPressed: (){
+          close(context, "null");
+        },
+        icon: AnimatedIcon(
+          icon: AnimatedIcons.menu_arrow,
+          progress: transitionAnimation,
+        )
+    );
+  }
+  @override
+  Widget buildResults(BuildContext context) {
+    // TODO: implement buildResults
+    throw UnimplementedError();
+  }
+  @override
+  Widget buildSuggestions(BuildContext buildContext) {
+    return FutureBuilder(
+        future:  FirebaseFirestore.instance.collection('internet').get(const GetOptions(source: Source.cache)),
+        builder: ((context, snapshot){
+          var users = snapshot.data?.docs;
+          if(snapshot.connectionState == ConnectionState.done){
+            if(snapshot.hasData){
+              return ListView.builder(
+                  itemCount: users?.length,
+                  itemBuilder: (context, index){
+                    return _buildListView(buildContext, users, index);
+                  });
+            } else{
+              return ListTile(title: Text("No Data Found"),);
+            }
+          } else{
+            return Center(child: CircularProgressIndicator(),);
+          }
+        }));
+  }
+  Widget _buildListView(context, users, index){
+    if(users[index]['name'].toString().toLowerCase().contains(query.toLowerCase())){
+      return ValueListenableBuilder<bool>(
+        valueListenable:_checkboxValueNotifier,
+        builder: (context, isChecked, child) {
+          print(isChecked);
+          return AnimatedSwitcher(
+            duration: Duration(seconds: 1),
+            child: ListTile(
+              title: Text(capitalize(users[index]['name'])),
+              leading: Icon(Icons.person, size: 50,),
+              onTap: (){
+                try{
+                  lat = (users[index]['cords'] as GeoPoint).latitude;
+                  long = (users[index]['cords'] as GeoPoint).longitude;
+                  _latController.text = lat.toString();
+                  _longController.text = long.toString();
+                } catch(e){
+                  _latController.text = lat.toString();
+                  _longController.text = long.toString();
+                }
+                String user_id = users[index]['user_id'].toString();
+                String name = users[index]['name'];
+                String mobile = users[index]['mobile'].toString();
+                String isp = users[index]['isp'];
+                Navigator.of(context).pop();
+                showDialog(context: context, builder: (BuildContext context){
+                  _nameController.text = capitalize(name);
+                  _phoneInternetController.text = capitalize(mobile);
+                  _ispController.text = isp;
+                  _userIDController.text = user_id;
+                  _macController.text="";
+                  return AlertDialog(
+                    title: const Text("Edit Form"),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment:
+                        MainAxisAlignment.start,
+                        children: [
+
+                          SizedBox(height: 10,),
+                          SizedBox(
+                            child: TextField(
+                              enabled: false,
+                              decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                        20),
+                                  ),
+                                  label: const Text("User ID"),
+                                  prefixIcon: const Icon(
+                                    Icons.dns_outlined,)),
+                              keyboardType: TextInputType.name,
+                              controller: _userIDController,
+                            ),
+                          ),//User ID
+                          const SizedBox(
+                            height: 15,
+                          ),
+                          SizedBox(
+                            child: TextField(
+                              decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                        20),
+                                  ),
+                                  label: const Text("Name"),
+                                  prefixIcon: const Icon(
+                                      Icons.person_outline)),
+                              keyboardType: TextInputType.name,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]'))
+                              ],
+                              controller: _nameController,
+                            ),
+                          ),//Name
+                          const SizedBox(
+                            height: 15,
+                          ),
+                          SizedBox(
+                            child: TextField(
+                              decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                        20),
+                                  ),
+                                  label: const Text("Phone"),
+                                  prefixIcon: const Icon(
+                                      Icons.phone_outlined)),
+                              keyboardType: TextInputType.number,
+                              controller: _phoneInternetController,
+                              inputFormatters: [
+                                LengthLimitingTextInputFormatter(10),
+                                FilteringTextInputFormatter.allow(RegExp(r'[0-9]'))
+                              ],
+                            ),
+                          ),//Phone
+                          const SizedBox(
+                            height: 15,
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  decoration: InputDecoration(
+                                      border: OutlineInputBorder(
+                                        borderRadius:
+                                        BorderRadius.circular(
+                                            20),
+                                      ),
+                                      label: const Text("ISP"),
+                                      prefixIcon: const Icon(
+                                          Icons.dns_outlined)),
+                                  keyboardType: TextInputType.name,
+                                  controller: _ispController,
+                                ),
+                              ),
+                              Visibility(
+                                visible: _ispController.text == 'BSNL'?true:false,
+                                child: Checkbox(
+                                    value: isChecked,
+                                    onChanged: (newValue){
+                                      _checkboxValueNotifier.value = true;
+                                      print(_checkboxValueNotifier.value);
+
+                                    }),
+                              )
+                            ],
+                          ),//ISP
+                          const SizedBox(
+                            height: 15,
+                          ),
+                          SizedBox(
+                            child: TextField(
+                              decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                        20),
+                                  ),
+                                  label: const Text("MAC"),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(Icons.camera_alt_outlined),
+                                    onPressed: () async {
+                                      final barcodeScanRes = await FlutterBarcodeScanner.scanBarcode('#ff0000', 'Cancel', true, ScanMode.BARCODE);
+                                      _macController.text = barcodeScanRes;
+                                    },)
+                              ),
+                              keyboardType: TextInputType.number,
+                              controller: _macController,
+                              textCapitalization: TextCapitalization.characters,
+                              inputFormatters: [
+                                LengthLimitingTextInputFormatter(12),
+                                FilteringTextInputFormatter.allow(RegExp(r'[0-9A-F]'))
+                              ],
+                            ),
+                          ),//MAC
+                          const SizedBox(
+                            height: 15,
+                          ),
+                          SizedBox(
+                            child: TextField(
+                                decoration: InputDecoration(
+                                    border: OutlineInputBorder(
+                                      borderRadius:
+                                      BorderRadius.circular(
+                                          20),
+                                    ),
+                                    label:
+                                    const Text("Latitude"),
+                                    suffixIcon: IconButton(
+                                        onPressed: () async {
+                                          Position data = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
+                                          const Duration(seconds: 1);
+                                          _latController.text = data.latitude.toString();
+                                          _longController.text = data.longitude.toString();
+                                        },
+                                        icon: const Icon(Icons
+                                            .add_location_alt_outlined))),
+                                keyboardType:
+                                TextInputType.number,
+                                controller:_latController
+                            ),
+                          ),//Latitude
+                          const SizedBox(
+                            height: 15,
+                          ),
+                          SizedBox(
+                            child: TextField(
+                              decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                        20),
+                                  ),
+                                  label:
+                                  const Text("Longitude"),
+                                  suffixIcon: IconButton(
+                                      onPressed: () async {
+                                        Position data =
+                                        await Geolocator.getCurrentPosition();
+                                        const Duration(seconds: 1);
+                                        _longController.text = data.longitude.toString();
+                                        _latController.text = data.latitude.toString();
+                                      },
+                                      icon: const Icon(Icons
+                                          .add_location_alt_outlined))),
+                              keyboardType:
+                              TextInputType.number,
+                              controller: _longController,
+                            ),
+                          ),//Longitude
+
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      OutlinedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text("Cancel"),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          updateDateInternet(
+                              GeoPoint(double.parse(_latController.text), double.parse(_longController.text)),
+                              user_id,
+                              _nameController.text,
+                              int.parse(_phoneInternetController.text),
+                              _ispController.text,
+                              _macController.text
+                          );
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text("Save"),
+                      ),
+                    ],
+                  );
+                });
+              },
+            ),
+          );
+        },
+      );
+
+    } else{
+      return SizedBox(height: 0,);
+    }
+  }
 }
