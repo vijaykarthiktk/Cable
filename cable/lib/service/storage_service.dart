@@ -6,10 +6,14 @@ import 'package:flutter/foundation.dart';
 class Storage{
   final FirebaseStorage storage = FirebaseStorage.instance;
   final CachedFirestorage cacheStorage = CachedFirestorage.instance;
-  uploadFileCable(String fileName, String filePath) async {
+  uploadFileCable(String fileName, String filePath, bool isCable) async {
     File file = File(filePath);
     try{
-      await storage.ref('cable/$fileName').putFile(file);
+      if(isCable){
+        await storage.ref('cable/$fileName').putFile(file);
+      }else{
+        await storage.ref('internet/$fileName').putFile(file);
+      }
     } on FirebaseException catch (e){
       if (kDebugMode) {
         print(e);

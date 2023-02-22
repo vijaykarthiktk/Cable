@@ -125,11 +125,6 @@ class _MyHomePageState extends State<MyHomePage> {
       });
     }
   }
-
-  String getImage(String crf) {
-    return "http://spbhss.live/CableCard/cable/$crf.jpg";
-  }
-
   getCurrentLocation() async {
     final location = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.best,
@@ -139,11 +134,10 @@ class _MyHomePageState extends State<MyHomePage> {
       long = location.longitude;
     });
   }
-
   _onMapCreated(GoogleMapController controller) {
     getCurrentLocation();
   }
-
+  ///Create New Record for Cable
   createDataCable(String crf, String chipID, bool status, cname, int mobile, GeoPoint cords) async {
     await FirebaseFirestore.instance.collection("marker").doc("crf").set({
       'chipid': chipID,
@@ -157,20 +151,23 @@ class _MyHomePageState extends State<MyHomePage> {
   createDataInternet(String userID, String name, int phone, String isp, String mac, GeoPoint location) async {
     var mobile = await MobileNumber.mobileNumber ?? "";
     mobile = mobile.toString().substring(2, mobile.length);
-    await FirebaseFirestore.instance.collection("internet").add({
-      'user_id': userID,
-      'name': capitalize(name),
-      'mobile': phone,
-      'isp': isp.toUpperCase(),
-      'mac':mac,
-      'cords': location,
-      'updated_by': mobile,
-      'date_time': "${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year} ${DateTime.now().hour % 12}:${DateTime.now().minute}"
-    });
+    if(_userIDInternt.contains(userID)){
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("User Record Found")));
+    }else{
+      await FirebaseFirestore.instance.collection("internet").add({
+        'user_id': userID,
+        'name': capitalize(name),
+        'mobile': phone,
+        'isp': isp.toUpperCase(),
+        'mac':mac,
+        'cords': location,
+        'updated_by': mobile,
+        'date_time': "${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year} ${DateTime.now().hour % 12}:${DateTime.now().minute}"
+      });
+    }
   }
-
   loadMarkersCable() async {
-    FirebaseFirestore.instance.settings = Settings(
+    FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
     );
     final documentSnapshot = await FirebaseFirestore.instance
@@ -179,7 +176,6 @@ class _MyHomePageState extends State<MyHomePage> {
     var users = documentSnapshot.docs;
     setState(() {
       _markersCable = users.map((user) {
-        // uploadingData(user['CRF'].toString(),user['CHIPID'].toString(), user['STATUS']=="YES"?true:false,user['CNAME'].toString(),user['MOBILE'],GeoPoint(user['LAT'], user['LONG']));
         double lat = (user['cords'] as GeoPoint).latitude;
         double long = (user['cords'] as GeoPoint).longitude;
         String crf = user['crf'].toString();
@@ -206,9 +202,7 @@ class _MyHomePageState extends State<MyHomePage> {
             final filePath = image?.path;
             final fileName = '$crf.jpg';
             final Storage storage = Storage();
-            storage.uploadFileCable(fileName, filePath!).then((value){
-              print(value);
-            });
+            storage.uploadFileCable(fileName, filePath!, true);
           }
         }
 
@@ -626,7 +620,7 @@ class _MyHomePageState extends State<MyHomePage> {
       }).toList();
     });
   }
-
+  ///Create InfoWindow For Internet Data
   loadMarkerInternet() async {
     // final String response = await rootBundle.loadString('assets/internet.json');
     // final users = await json.decode(response);
@@ -645,22 +639,434 @@ class _MyHomePageState extends State<MyHomePage> {
         _nameInternet.add(name);
         _phoneInternt.add(phone.toString());
         _userIDInternt.add(user_id);
-        try{
-          String date_time = user['date_time'];
-          String mac = user['mac'];
-        }catch(e){
-          if(kDebugMode){
-            print(e);
+
+        XFile? image;
+        final ImagePicker _picker = ImagePicker();
+
+        void getImagePath(ImageSource source, String crf) async {
+          image = await _picker.pickImage(
+              source: source,
+              preferredCameraDevice: CameraDevice.rear,
+              requestFullMetadata: true,
+              imageQuality: 90
+          );
+          if(image == null){
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No Image Selectec")));
+          } else{
+            final filePath = image?.path;
+            final fileName = '$crf.jpg';
+            final Storage storage = Storage();
+            storage.uploadFileCable(fileName, filePath!, false).then((value){
+              print(value);
+            });
           }
         }
-        // uploadingDataInternet(user_id,name, phone, status, isp);
+
         try{
+          String date_time = user['date_time'];
+          String mac = user['mac']??"";
           GeoPoint location = user['cords'];
           return Marker(
               markerId: MarkerId(user_id),
               position: LatLng(location.longitude, location.latitude),
-              infoWindow: InfoWindow(title: name.toString(), snippet: phone.toString()));
-        }catch (e){
+              infoWindow: InfoWindow(
+                  title: name.toString(),
+                  snippet: phone.toString(),
+                  onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return Dialog(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(
+                                height: 20,
+                              ),
+                              SizedBox(
+                                  width: 120,
+                                  height: 160,
+                                  child: GestureDetector(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: FutureBuilder(
+                                          future: CachedFirestorage.instance.getDownloadURL(mapKey: '10', filePath: 'internet/$crf.png',),
+                                          builder:(_ ,snapshot){
+                                            print(crf);
+                                            if(snapshot.connectionState == ConnectionState.done){
+                                              return ClipRRect(
+                                                borderRadius: BorderRadius.circular(10),
+                                                child: Image.network(
+                                                  snapshot.data!,
+                                                  errorBuilder: (context, error, stackTrace) {
+                                                    return const Icon(
+                                                      Icons.no_photography_outlined,
+                                                      size: 50,
+                                                    );
+                                                  },
+                                                ),
+                                              );
+                                            } else {
+                                              return Center(child: CircularProgressIndicator());
+                                            }
+                                          }
+                                      ),
+                                    ),
+                                    onTap: () {
+                                      showModalBottomSheet(
+                                          context: context,
+                                          builder: (BuildContext context) {
+                                            return SizedBox(
+                                              height: 200,
+                                              child: Padding(
+                                                  padding: const EdgeInsets.all(18.0),
+                                                  child: Row(
+                                                    mainAxisAlignment:
+                                                    MainAxisAlignment.spaceAround,
+                                                    children: [
+                                                      IconButton(
+                                                        onPressed: () {
+                                                          Navigator.of(context).pop();
+                                                          getImagePath(
+                                                              ImageSource.camera, crf);
+                                                        },
+                                                        icon: Column(
+                                                          mainAxisSize:
+                                                          MainAxisSize.min,
+                                                          children: const [
+                                                            Icon(
+                                                              Icons.camera_alt_outlined,
+                                                              size: 60,
+                                                            ),
+                                                            Text("Camera")
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      IconButton(
+                                                        onPressed: () {
+                                                          Navigator.of(context).pop();
+                                                          getImagePath(
+                                                              ImageSource.gallery, crf);
+                                                        },
+                                                        icon: Column(
+                                                          mainAxisSize:
+                                                          MainAxisSize.min,
+                                                          children: const [
+                                                            Icon(
+                                                              Icons
+                                                                  .photo_library_outlined,
+                                                              size: 60,
+                                                            ),
+                                                            Text("Gallary")
+                                                          ],
+                                                        ),
+                                                      )
+                                                    ],
+                                                  )),
+                                            );
+                                          });
+                                    },
+                                  )
+                              ),
+                              Text(
+                                capitalize(name),
+                                style: const TextStyle(fontSize: 25),
+                              ),
+                              const Divider(),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  IconButton(
+                                    onPressed: () {},
+                                    icon: Column(
+                                      children: const [
+                                        Icon(
+                                          Icons.call_outlined,
+                                          size: 30,
+                                        ),
+                                        Text(
+                                          "Call",
+                                        )
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () {},
+                                    icon: Column(
+                                      children: const [
+                                        Icon(
+                                          Icons.message_outlined,
+                                          size: 30,
+                                        ),
+                                        Text(
+                                          "Text",
+                                        )
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () {},
+                                    icon: Column(
+                                      children: const [
+                                        Icon(
+                                          Icons.directions_outlined,
+                                          size: 30,
+                                        ),
+                                        Text(
+                                          "Direction",
+                                        )
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () {
+                                      showDialog(
+                                          context: context,
+                                          builder: (BuildContext context) {
+                                            _latController.text = lat.toString();
+                                            _longController.text = long.toString();
+                                            _cnameController.text = capitalize(name);
+                                            _phoneCableController.text = capitalize(phone.toString());
+                                            return AlertDialog(
+                                              title: const Text("Edit Location"),
+                                              content: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                mainAxisAlignment:
+                                                MainAxisAlignment.start,
+                                                children: [
+                                                  SizedBox(
+                                                    child: TextField(
+                                                      decoration: InputDecoration(
+                                                          border: OutlineInputBorder(
+                                                            borderRadius:
+                                                            BorderRadius.circular(
+                                                                20),
+                                                          ),
+                                                          label: const Text("Name"),
+                                                          prefixIcon: const Icon(
+                                                              Icons.person_outline)),
+                                                      keyboardType: TextInputType.name,
+                                                      controller: _cnameController,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(
+                                                    height: 15,
+                                                  ),
+                                                  SizedBox(
+                                                    child: TextField(
+                                                      decoration: InputDecoration(
+                                                          border: OutlineInputBorder(
+                                                            borderRadius:
+                                                            BorderRadius.circular(
+                                                                20),
+                                                          ),
+                                                          label: const Text("Phone"),
+                                                          prefixIcon: const Icon(
+                                                              Icons.phone_outlined)),
+                                                      keyboardType: const TextInputType
+                                                          .numberWithOptions(
+                                                          decimal: false),
+                                                      controller: _phoneCableController,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(
+                                                    height: 15,
+                                                  ),
+                                                  SizedBox(
+                                                    child: TextField(
+                                                      decoration: InputDecoration(
+                                                          border: OutlineInputBorder(
+                                                            borderRadius:
+                                                            BorderRadius.circular(
+                                                                20),
+                                                          ),
+                                                          label: const Text("Latitude"),
+                                                          suffixIcon: IconButton(
+                                                              onPressed: () async {
+                                                                Position data =
+                                                                await Geolocator
+                                                                    .getCurrentPosition();
+                                                                const Duration(
+                                                                    seconds: 1);
+                                                                print(data.latitude);
+                                                                setState(() {
+                                                                  _latController.text =
+                                                                      data.latitude
+                                                                          .toString();
+                                                                });
+                                                              },
+                                                              icon: const Icon(Icons
+                                                                  .add_location_alt_outlined))),
+                                                      keyboardType:
+                                                      TextInputType.number,
+                                                      controller: _latController,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(
+                                                    height: 15,
+                                                  ),
+                                                  SizedBox(
+                                                    child: TextField(
+                                                      decoration: InputDecoration(
+                                                          border: OutlineInputBorder(
+                                                            borderRadius:
+                                                            BorderRadius.circular(
+                                                                20),
+                                                          ),
+                                                          label:
+                                                          const Text("Longitude"),
+                                                          suffixIcon: IconButton(
+                                                              onPressed: () async {
+                                                                Position data =
+                                                                await Geolocator
+                                                                    .getCurrentPosition();
+                                                                const Duration(
+                                                                    seconds: 1);
+                                                                print(data.longitude);
+                                                                setState(() {
+                                                                  _longController.text =
+                                                                      data.longitude
+                                                                          .toString();
+                                                                });
+                                                              },
+                                                              icon: const Icon(Icons
+                                                                  .add_location_alt_outlined))),
+                                                      keyboardType:
+                                                      TextInputType.number,
+                                                      controller: _longController,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              actions: [
+                                                OutlinedButton(
+                                                  onPressed: () {
+                                                    Navigator.of(context).pop();
+                                                  },
+                                                  child: const Text("Cancel"),
+                                                ),
+                                                FilledButton(
+                                                  onPressed: () {
+                                                    updateDataCable(
+                                                        GeoPoint(
+                                                            double.parse(
+                                                                _latController.text),
+                                                            double.parse(
+                                                                _longController.text)),
+                                                        crf,
+                                                        _cnameController.text,
+                                                        int.parse(
+                                                            _phoneCableController.text));
+                                                  },
+                                                  child: const Text("Save"),
+                                                ),
+                                              ],
+                                            );
+                                          });
+                                    },
+                                    icon: Column(
+                                      children: const [
+                                        Icon(
+                                          Icons.edit_outlined,
+                                          size: 30,
+                                        ),
+                                        Text(
+                                          "Edit",
+                                        )
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Divider(),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  const SizedBox(
+                                    width: 10,
+                                  ),
+                                  SizedBox(
+                                    width: 290,
+                                    child: Card(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      elevation: 0,
+                                      color:
+                                      Theme.of(context).colorScheme.surfaceVariant,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.only(
+                                                left: 15, top: 15),
+                                            child: const Text(
+                                              "Customer Info",
+                                              style: TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.w500),
+                                            ),
+                                          ),
+                                          ListTile(
+                                            leading: const Icon(Icons.person_outline),
+                                            title: Text(crf),
+                                            onTap: () {},
+                                          ),
+                                          ListTile(
+                                            leading: const Icon(Icons.call_outlined),
+                                            title: Text(phone.toString()),
+                                            trailing: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                    onPressed: () {},
+                                                    icon: const Icon(
+                                                        Icons.message_outlined))
+                                              ],
+                                            ),
+                                            onTap: () {},
+                                          ),
+                                          ListTile(
+                                            leading:
+                                            const Icon(Icons.location_on_outlined),
+                                            title: Text(
+                                              "${lat.toString()},${long.toString()}",
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            subtitle: const Text("Home"),
+                                            trailing: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                    onPressed: () {},
+                                                    icon: const Icon(
+                                                        Icons.directions_outlined))
+                                              ],
+                                            ),
+                                            onTap: () {},
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    width: 10,
+                                  )
+                                ],
+                              ),
+                              const SizedBox(
+                                height: 10,
+                              )
+                            ],
+                          ));
+                    },
+                  );
+                },
+
+              )
+          );
+        }catch(e){
           return Marker(
               markerId: MarkerId(user_id),
               position: LatLng(11.1728978, 75.9205007),
@@ -1095,6 +1501,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
 double lat = 0;
 double long = 0;
+
 updateDataCable(GeoPoint cords, String crf, String name, int phone) async {
   var mobile = await MobileNumber.mobileNumber ?? "";
   mobile = mobile.toString().substring(2, mobile.length);
@@ -1625,16 +2032,19 @@ class DataSearchInternet extends SearchDelegate<String>{
                             child: TextField(
                               decoration: InputDecoration(
                                   border: OutlineInputBorder(
-                                    borderRadius:
-                                    BorderRadius.circular(
-                                        20),
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
                                   label: const Text("MAC"),
                                   suffixIcon: IconButton(
                                     icon: Icon(Icons.camera_alt_outlined),
                                     onPressed: () async {
                                       final barcodeScanRes = await FlutterBarcodeScanner.scanBarcode('#ff0000', 'Cancel', true, ScanMode.BARCODE);
-                                      _macController.text = barcodeScanRes;
+                                      if(barcodeScanRes == "-1"){
+                                        _macController.text = '';
+                                      } else{
+                                        _macController.text = barcodeScanRes;
+
+                                      }
                                     },)
                               ),
                               keyboardType: TextInputType.number,
@@ -1701,7 +2111,6 @@ class DataSearchInternet extends SearchDelegate<String>{
                               controller: _longController,
                             ),
                           ),//Longitude
-
                         ],
                       ),
                     ),
