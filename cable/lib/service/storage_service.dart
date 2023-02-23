@@ -10,6 +10,7 @@ class Storage{
     File file = File(filePath);
     try{
       if(isCable){
+        print("cable");
         await storage.ref('cable/$fileName').putFile(file);
       }else{
         await storage.ref('internet/$fileName').putFile(file);
