@@ -8,11 +8,14 @@ import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:system_theme/system_theme.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 main() async {
   ErrorWidget.builder = (FlutterErrorDetails details){
@@ -106,6 +109,22 @@ class _MyHomePageState extends State<MyHomePage> {
       loadMarkersCable();
       loadMarkerInternet();
     });
+  }
+
+  makeCall(String number){
+    FlutterPhoneDirectCaller.callNumber(number);
+  }
+  openWhatapp(String number){
+    String url = "whatsapp://send?phone=+91$number";
+    launch(url);
+  }
+  static void navigateTo(double lat, double lng) async {
+    var uri = Uri.parse("google.navigation:q=$lat,$lng&mode=d");
+    if (await canLaunch(uri.toString())) {
+      await launch(uri.toString());
+    } else {
+      throw 'Could not launch ${uri.toString()}';
+    }
   }
 
   getCurrentLocation() async {
@@ -306,7 +325,9 @@ class _MyHomePageState extends State<MyHomePage> {
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
                                 IconButton(
-                                  onPressed: () {},
+                                  onPressed: () {
+                                    makeCall(mobile);
+                                  },
                                   icon: Column(
                                     children: const [
                                       Icon(
@@ -320,21 +341,22 @@ class _MyHomePageState extends State<MyHomePage> {
                                   ),
                                 ),
                                 IconButton(
-                                  onPressed: () {},
+                                  onPressed: () {
+                                    openWhatapp(mobile);
+                                  },
                                   icon: Column(
                                     children: const [
-                                      Icon(
-                                        Icons.message_outlined,
-                                        size: 30,
-                                      ),
+                                      FaIcon(FontAwesomeIcons.whatsapp,size: 30,),
                                       Text(
-                                        "Text",
+                                        "WhatsApp",
                                       )
                                     ],
                                   ),
                                 ),
                                 IconButton(
-                                  onPressed: () {},
+                                  onPressed: () {
+                                    navigateTo(lat, long);
+                                  },
                                   icon: Column(
                                     children: const [
                                       Icon(
@@ -430,7 +452,8 @@ class _MyHomePageState extends State<MyHomePage> {
                               height: 10,
                             )
                           ],
-                        ));
+                        )
+                    );
                   },
                 );
               },
@@ -593,7 +616,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                 children: [
                                   IconButton(
-                                    onPressed: () {},
+                                    onPressed: () {
+                                      makeCall(phone.toString());
+                                    },
                                     icon: Column(
                                       children: const [
                                         Icon(
@@ -607,11 +632,13 @@ class _MyHomePageState extends State<MyHomePage> {
                                     ),
                                   ),
                                   IconButton(
-                                    onPressed: () {},
+                                    onPressed: () {
+                                      openWhatapp(phone.toString());
+                                    },
                                     icon: Column(
                                       children: const [
-                                        Icon(
-                                          Icons.message_outlined,
+                                        FaIcon(
+                                          FontAwesomeIcons.whatsapp,
                                           size: 30,
                                         ),
                                         Text(
@@ -621,7 +648,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                     ),
                                   ),
                                   IconButton(
-                                    onPressed: () {},
+                                    onPressed: () {
+                                      navigateTo(location.latitude, location.longitude);
+                                    },
                                     icon: Column(
                                       children: const [
                                         Icon(
@@ -1232,10 +1261,6 @@ updateDateInternet(GeoPoint cords, String userID, String name, int phone, String
   }
 }
 
-String getImage(String crf){
-  return "http://spbhss.live/CableCard/cable/$crf.jpg";
-}
-
 String capitalize(String s) {
   List<String> names = s.replaceAll(".", " ").split(" ");
   String returnName = "";
@@ -1581,7 +1606,31 @@ class DataSearchInternet extends SearchDelegate<String>{
     users[index]['mobile'].toString().contains(query.toLowerCase())){
       return ListTile(
         title: Text(capitalize(users[index]['name'])),
-        leading: Icon(Icons.person, size: 50,),
+        leading: SizedBox(
+          width: 75,
+          height: 100,
+          child: FutureBuilder(
+              future: CachedFirestorage.instance.getDownloadURL(mapKey: users[index]['user_id'], filePath: 'internet/${users[index]['user_id'].toString()}.jpg',),
+              builder:(_ ,snapshot){
+                if(snapshot.connectionState == ConnectionState.done){
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      snapshot.data!,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.person,
+                          size: 50,
+                        );
+                      },
+                    ),
+                  );
+                } else {
+                  return Center(child: CircularProgressIndicator());
+                }
+              }
+          ),
+        ),
         subtitle: Text("${users[index]['mobile'].toString()}\n${users[index]['user_id']}", style: TextStyle(fontWeight: FontWeight.w100),),
         isThreeLine: true,
         onTap: (){
@@ -1835,7 +1884,6 @@ class DataSearchInternet extends SearchDelegate<String>{
           });
         },
       );
-
     } else{
       return SizedBox(height: 0,);
     }
