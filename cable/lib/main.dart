@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:system_theme/system_theme.dart';
-import 'package:mobile_number/mobile_number.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
 import 'package:flutter/material.dart';
@@ -87,8 +86,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
   LatLng currentPosition = const LatLng(11.1795878, 75.9271907);
 
-  late String _mobileNo;
-
   List<String> _cnameCable = [];
   List<String> _crfCable = [];
   List<String> _phoneCable = [];
@@ -97,28 +94,6 @@ class _MyHomePageState extends State<MyHomePage> {
   List<String> _userIDInternt = [];
   List<String> _phoneInternt = [];
 
-  XFile? image;
-
-  final ImagePicker _picker = ImagePicker();
-
-  void getImagePath(ImageSource source, String crf) async {
-    image = await _picker.pickImage(
-        source: source,
-        preferredCameraDevice: CameraDevice.rear,
-        requestFullMetadata: true,
-        imageQuality: 90
-    );
-    if(image == null){
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No Image Selectecd")));
-    } else{
-      final filePath = image?.path;
-      final fileName = '$crf.jpg';
-      final Storage storage = Storage();
-      storage.uploadFileCable(fileName, filePath!, true).then((value){
-        print('done');
-      });
-    }
-  }
 
   @override
   initState() {
@@ -127,33 +102,12 @@ class _MyHomePageState extends State<MyHomePage> {
     Geolocator.requestPermission();
     Geolocator.getCurrentPosition();
     getCurrentLocation();
-    MobileNumber.listenPhonePermission((isPermissionGranted) {
-      if (isPermissionGranted) {
-        initMobileNumberState();
-      }
-    });
-    initMobileNumberState();
     Firebase.initializeApp().whenComplete(() {
       loadMarkersCable();
       loadMarkerInternet();
     });
   }
 
-
-  initMobileNumberState() async {
-    DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-    AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-    var mobile = androidInfo.model;
-    try {
-      setState(() {
-        _mobileNo = mobile;
-      });
-    } on PlatformException catch (e) {
-      setState(() {
-        _mobileNo = "Not Found";
-      });
-    }
-  }
   getCurrentLocation() async {
     final location = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.best,
@@ -195,6 +149,7 @@ class _MyHomePageState extends State<MyHomePage> {
       });
     }
   }
+
   loadMarkersCable() async {
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
@@ -203,6 +158,29 @@ class _MyHomePageState extends State<MyHomePage> {
         .collection('marker')
         .get(const GetOptions(source: Source.serverAndCache));
     var users = documentSnapshot.docs;
+    XFile? image;
+
+    final ImagePicker _picker = ImagePicker();
+
+    void getImagePath(ImageSource source, String crf) async {
+      image = await _picker.pickImage(
+          source: source,
+          preferredCameraDevice: CameraDevice.rear,
+          requestFullMetadata: true,
+          imageQuality: 90
+      );
+      if(image == null){
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No Image Selectecd")));
+      } else{
+        final filePath = image?.path;
+        final fileName = '$crf.jpg';
+        final Storage storage = Storage();
+        storage.uploadFileCable(fileName, filePath!, true).then((value){
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Uploaded")));
+        });
+      }
+    }
+
     setState(() {
       _markersCable = users.map((user) {
         double lat = (user['cords'] as GeoPoint).latitude;
@@ -214,10 +192,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _cnameCable.add(capitalize(cname));
         _crfCable.add(crf);
         _phoneCable.add(mobile);
-
-
-        try{
-          var date_time = user['date_time'];
+        if(user.data().containsKey('date_time')){
           return Marker(
             markerId: MarkerId(crf),
             position: LatLng(lat, long),
@@ -247,14 +222,12 @@ class _MyHomePageState extends State<MyHomePage> {
                                     child: FutureBuilder(
                                       future: CachedFirestorage.instance.getDownloadURL(mapKey: crf, filePath: 'cable/$crf.jpg',),
                                       builder:(_ ,snapshot){
-                                        print(crf);
                                         if(snapshot.connectionState == ConnectionState.done){
                                           return ClipRRect(
                                             borderRadius: BorderRadius.circular(10),
                                             child: Image.network(
                                               snapshot.data!,
                                               errorBuilder: (context, error, stackTrace) {
-                                                print(error);
                                                 return const Icon(
                                                   Icons.no_photography_outlined,
                                                   size: 50,
@@ -374,164 +347,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     ],
                                   ),
                                 ),
-                                IconButton(
-                                  onPressed: () {
-                                    showDialog(
-                                        context: context,
-                                        builder: (BuildContext context) {
-                                          _latController.text = lat.toString();
-                                          _longController.text = long.toString();
-                                          _cnameController.text = capitalize(cname);
-                                          _phoneCableController.text = capitalize(mobile);
-                                          return AlertDialog(
-                                            title: const Text("Edit Location"),
-                                            content: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                              children: [
-                                                SizedBox(
-                                                  child: TextField(
-                                                    decoration: InputDecoration(
-                                                        border: OutlineInputBorder(
-                                                          borderRadius:
-                                                          BorderRadius.circular(
-                                                              20),
-                                                        ),
-                                                        label: const Text("Name"),
-                                                        prefixIcon: const Icon(
-                                                            Icons.person_outline)),
-                                                    keyboardType: TextInputType.name,
-                                                    controller: _cnameController,
-                                                  ),
-                                                ),
-                                                const SizedBox(
-                                                  height: 15,
-                                                ),
-                                                SizedBox(
-                                                  child: TextField(
-                                                    decoration: InputDecoration(
-                                                        border: OutlineInputBorder(
-                                                          borderRadius:
-                                                          BorderRadius.circular(
-                                                              20),
-                                                        ),
-                                                        label: const Text("Phone"),
-                                                        prefixIcon: const Icon(
-                                                            Icons.phone_outlined)),
-                                                    keyboardType: const TextInputType
-                                                        .numberWithOptions(
-                                                        decimal: false),
-                                                    controller: _phoneCableController,
-                                                  ),
-                                                ),
-                                                const SizedBox(
-                                                  height: 15,
-                                                ),
-                                                SizedBox(
-                                                  child: TextField(
-                                                    decoration: InputDecoration(
-                                                        border: OutlineInputBorder(
-                                                          borderRadius:
-                                                          BorderRadius.circular(
-                                                              20),
-                                                        ),
-                                                        label: const Text("Latitude"),
-                                                        suffixIcon: IconButton(
-                                                            onPressed: () async {
-                                                              Position data =
-                                                              await Geolocator
-                                                                  .getCurrentPosition();
-                                                              const Duration(
-                                                                  seconds: 1);
-                                                              print(data.latitude);
-                                                              setState(() {
-                                                                _latController.text =
-                                                                    data.latitude
-                                                                        .toString();
-                                                              });
-                                                            },
-                                                            icon: const Icon(Icons
-                                                                .add_location_alt_outlined))),
-                                                    keyboardType:
-                                                    TextInputType.number,
-                                                    controller: _latController,
-                                                  ),
-                                                ),
-                                                const SizedBox(
-                                                  height: 15,
-                                                ),
-                                                SizedBox(
-                                                  child: TextField(
-                                                    decoration: InputDecoration(
-                                                        border: OutlineInputBorder(
-                                                          borderRadius:
-                                                          BorderRadius.circular(
-                                                              20),
-                                                        ),
-                                                        label:
-                                                        const Text("Longitude"),
-                                                        suffixIcon: IconButton(
-                                                            onPressed: () async {
-                                                              Position data =
-                                                              await Geolocator
-                                                                  .getCurrentPosition();
-                                                              const Duration(
-                                                                  seconds: 1);
-                                                              print(data.longitude);
-                                                              setState(() {
-                                                                _longController.text =
-                                                                    data.longitude
-                                                                        .toString();
-                                                              });
-                                                            },
-                                                            icon: const Icon(Icons
-                                                                .add_location_alt_outlined))),
-                                                    keyboardType:
-                                                    TextInputType.number,
-                                                    controller: _longController,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            actions: [
-                                              OutlinedButton(
-                                                onPressed: () {
-                                                  Navigator.of(context).pop();
-                                                },
-                                                child: const Text("Cancel"),
-                                              ),
-                                              FilledButton(
-                                                onPressed: () {
-                                                  updateDataCable(
-                                                      GeoPoint(
-                                                          double.parse(
-                                                              _latController.text),
-                                                          double.parse(
-                                                              _longController.text)),
-                                                      crf,
-                                                      _cnameController.text,
-                                                      int.parse(
-                                                          _phoneCableController.text));
-                                                },
-                                                child: const Text("Save"),
-                                              ),
-                                            ],
-                                          );
-                                        });
-                                  },
-                                  icon: Column(
-                                    children: const [
-                                      Icon(
-                                        Icons.edit_outlined,
-                                        size: 30,
-                                      ),
-                                      Text(
-                                        "Edit",
-                                      )
-                                    ],
-                                  ),
-                                ),
                               ],
                             ),
                             const Divider(),
@@ -622,22 +437,18 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
           );
         }
-        catch(e){
+        else{
           return Marker(markerId: MarkerId(user['crf']));
 
         }
-
       }).toList();
     });
   }
-  ///Create InfoWindow For Internet Data
   loadMarkerInternet() async {
     // final String response = await rootBundle.loadString('assets/internet.json');
     // final users = await json.decode(response);
 
-    final documentSnapshot = await FirebaseFirestore.instance
-        .collection('internet')
-        .get(GetOptions(source: Source.serverAndCache));
+    final documentSnapshot = await FirebaseFirestore.instance.collection('internet').get(const GetOptions(source: Source.serverAndCache));
     var users = documentSnapshot.docs;
     setState(() {
       _makerInternet = users.map((user) {
@@ -652,37 +463,34 @@ class _MyHomePageState extends State<MyHomePage> {
         XFile? image;
         final ImagePicker _picker = ImagePicker();
 
-        void getImagePath(ImageSource source, String crf) async {
+        void getImagePath(ImageSource source, String userId) async {
           image = await _picker.pickImage(
               source: source,
               preferredCameraDevice: CameraDevice.rear,
               requestFullMetadata: true,
-              imageQuality: 90
+              imageQuality: 85
           );
           if(image == null){
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No Image Selectec")));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No Image Selected")));
           } else{
             final filePath = image?.path;
-            final fileName = '$crf.jpg';
+            final fileName = '$userId.jpg';
             final Storage storage = Storage();
             storage.uploadFileCable(fileName, filePath!, false).then((value){
-              print(value);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Uploaded")));
             });
           }
         }
-
-        if(user.data().containsKey('mac')){
-          String mac = user['mac'];
-          GeoPoint location = user['cords'];
-          print(location.latitude);
-          print(name);
+        if(user.data().containsKey('cords')){
+          GeoPoint location  = user['cords'];
+          String mac  = user['mac'];
           return Marker(
               markerId: MarkerId(user_id),
-              position: LatLng(location.longitude, location.latitude),
+              position: LatLng(location.latitude, location.longitude),
               infoWindow: InfoWindow(
-                  title: name.toString(),
-                  snippet: phone.toString(),
-                  onTap: () {
+                title: name.toString(),
+                snippet: phone.toString(),
+                onTap: () {
                   showDialog(
                     context: context,
                     builder: (BuildContext context) {
@@ -700,9 +508,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(10),
                                       child: FutureBuilder(
-                                          future: CachedFirestorage.instance.getDownloadURL(mapKey: '10', filePath: 'internet/$crf.png',),
+                                          future: CachedFirestorage.instance.getDownloadURL(mapKey: user_id, filePath: 'internet/$user_id.jpg',),
                                           builder:(_ ,snapshot){
-                                            print(crf);
                                             if(snapshot.connectionState == ConnectionState.done){
                                               return ClipRRect(
                                                 borderRadius: BorderRadius.circular(10),
@@ -737,8 +544,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                                       IconButton(
                                                         onPressed: () {
                                                           Navigator.of(context).pop();
-                                                          getImagePath(
-                                                              ImageSource.camera, crf);
+                                                          getImagePath(ImageSource.camera, user_id,);
                                                         },
                                                         icon: Column(
                                                           mainAxisSize:
@@ -756,7 +562,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                                         onPressed: () {
                                                           Navigator.of(context).pop();
                                                           getImagePath(
-                                                              ImageSource.gallery, crf);
+                                                              ImageSource.gallery, user_id);
                                                         },
                                                         icon: Column(
                                                           mainAxisSize:
@@ -828,164 +634,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                       ],
                                     ),
                                   ),
-                                  IconButton(
-                                    onPressed: () {
-                                      showDialog(
-                                          context: context,
-                                          builder: (BuildContext context) {
-                                            _latController.text = lat.toString();
-                                            _longController.text = long.toString();
-                                            _cnameController.text = capitalize(name);
-                                            _phoneCableController.text = capitalize(phone.toString());
-                                            return AlertDialog(
-                                              title: const Text("Edit Location"),
-                                              content: Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                mainAxisAlignment:
-                                                MainAxisAlignment.start,
-                                                children: [
-                                                  SizedBox(
-                                                    child: TextField(
-                                                      decoration: InputDecoration(
-                                                          border: OutlineInputBorder(
-                                                            borderRadius:
-                                                            BorderRadius.circular(
-                                                                20),
-                                                          ),
-                                                          label: const Text("Name"),
-                                                          prefixIcon: const Icon(
-                                                              Icons.person_outline)),
-                                                      keyboardType: TextInputType.name,
-                                                      controller: _cnameController,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(
-                                                    height: 15,
-                                                  ),
-                                                  SizedBox(
-                                                    child: TextField(
-                                                      decoration: InputDecoration(
-                                                          border: OutlineInputBorder(
-                                                            borderRadius:
-                                                            BorderRadius.circular(
-                                                                20),
-                                                          ),
-                                                          label: const Text("Phone"),
-                                                          prefixIcon: const Icon(
-                                                              Icons.phone_outlined)),
-                                                      keyboardType: const TextInputType
-                                                          .numberWithOptions(
-                                                          decimal: false),
-                                                      controller: _phoneCableController,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(
-                                                    height: 15,
-                                                  ),
-                                                  SizedBox(
-                                                    child: TextField(
-                                                      decoration: InputDecoration(
-                                                          border: OutlineInputBorder(
-                                                            borderRadius:
-                                                            BorderRadius.circular(
-                                                                20),
-                                                          ),
-                                                          label: const Text("Latitude"),
-                                                          suffixIcon: IconButton(
-                                                              onPressed: () async {
-                                                                Position data =
-                                                                await Geolocator
-                                                                    .getCurrentPosition();
-                                                                const Duration(
-                                                                    seconds: 1);
-                                                                print(data.latitude);
-                                                                setState(() {
-                                                                  _latController.text =
-                                                                      data.latitude
-                                                                          .toString();
-                                                                });
-                                                              },
-                                                              icon: const Icon(Icons
-                                                                  .add_location_alt_outlined))),
-                                                      keyboardType:
-                                                      TextInputType.number,
-                                                      controller: _latController,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(
-                                                    height: 15,
-                                                  ),
-                                                  SizedBox(
-                                                    child: TextField(
-                                                      decoration: InputDecoration(
-                                                          border: OutlineInputBorder(
-                                                            borderRadius:
-                                                            BorderRadius.circular(
-                                                                20),
-                                                          ),
-                                                          label:
-                                                          const Text("Longitude"),
-                                                          suffixIcon: IconButton(
-                                                              onPressed: () async {
-                                                                Position data =
-                                                                await Geolocator
-                                                                    .getCurrentPosition();
-                                                                const Duration(
-                                                                    seconds: 1);
-                                                                print(data.longitude);
-                                                                setState(() {
-                                                                  _longController.text =
-                                                                      data.longitude
-                                                                          .toString();
-                                                                });
-                                                              },
-                                                              icon: const Icon(Icons
-                                                                  .add_location_alt_outlined))),
-                                                      keyboardType:
-                                                      TextInputType.number,
-                                                      controller: _longController,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              actions: [
-                                                OutlinedButton(
-                                                  onPressed: () {
-                                                    Navigator.of(context).pop();
-                                                  },
-                                                  child: const Text("Cancel"),
-                                                ),
-                                                FilledButton(
-                                                  onPressed: () {
-                                                    updateDataCable(
-                                                        GeoPoint(
-                                                            double.parse(
-                                                                _latController.text),
-                                                            double.parse(
-                                                                _longController.text)),
-                                                        crf,
-                                                        _cnameController.text,
-                                                        int.parse(
-                                                            _phoneCableController.text));
-                                                  },
-                                                  child: const Text("Save"),
-                                                ),
-                                              ],
-                                            );
-                                          });
-                                    },
-                                    icon: Column(
-                                      children: const [
-                                        Icon(
-                                          Icons.edit_outlined,
-                                          size: 30,
-                                        ),
-                                        Text(
-                                          "Edit",
-                                        )
-                                      ],
-                                    ),
-                                  ),
                                 ],
                               ),
                               const Divider(),
@@ -1019,8 +667,17 @@ class _MyHomePageState extends State<MyHomePage> {
                                             ),
                                           ),
                                           ListTile(
+                                            leading:
+                                            const Icon(Icons.wifi_password),
+                                            title: Text(
+                                              "${mac}",
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            onTap: () {},
+                                          ),
+                                          ListTile(
                                             leading: const Icon(Icons.person_outline),
-                                            title: Text(crf),
+                                            title: Text(user_id),
                                             onTap: () {},
                                           ),
                                           ListTile(
@@ -1040,10 +697,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                             leading:
                                             const Icon(Icons.location_on_outlined),
                                             title: Text(
-                                              "${lat.toString()},${long.toString()}",
+                                              "${location.latitude},${location.longitude}",
                                               overflow: TextOverflow.ellipsis,
                                             ),
-                                            subtitle: const Text("Home"),
                                             trailing: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
@@ -1072,13 +728,12 @@ class _MyHomePageState extends State<MyHomePage> {
                     },
                   );
                 },
-
               )
           );
-        }else{
+        } else {
           return Marker(
-              markerId: MarkerId(user_id),
-              infoWindow: InfoWindow(title: name.toString(), snippet: phone.toString()));
+            markerId:  MarkerId(user_id)
+          );
         }
       }).toList();
     });
@@ -1127,10 +782,9 @@ class _MyHomePageState extends State<MyHomePage> {
       body: <Widget>[
         GoogleMap(
               onMapCreated: _onMapCreated,
+              mapToolbarEnabled: false,
               minMaxZoomPreference: MinMaxZoomPreference(14,20),
-              zoomControlsEnabled: false,
               compassEnabled: true,
-              mapType: MapType.normal,
               cameraTargetBounds: CameraTargetBounds(LatLngBounds(
                   northeast: const LatLng(11.199369, 75.934386),
                   southwest: const LatLng(11.154130, 75.903564))),
@@ -1141,16 +795,13 @@ class _MyHomePageState extends State<MyHomePage> {
               markers: Set.of(_markersCable),
             ),
         GoogleMap(
+          mapToolbarEnabled: false,
           cameraTargetBounds: CameraTargetBounds(LatLngBounds(
               northeast: const LatLng(11.199369, 75.934386),
               southwest: const LatLng(11.154130, 75.903564))),
           minMaxZoomPreference: MinMaxZoomPreference(14,20),
-          myLocationEnabled: true,
-          onMapCreated: _onMapCreated,
           compassEnabled: true,
-          myLocationButtonEnabled: true,
           markers: Set.of(_makerInternet),
-          trafficEnabled: true,
           initialCameraPosition: CameraPosition(
             target: currentPosition,
             zoom: 13.0,
@@ -1164,7 +815,6 @@ class _MyHomePageState extends State<MyHomePage> {
           } else{
             loadMarkerInternet();
           }
-          print("pressed");
         },
         child: FloatingActionButton(
           child: const Icon(
@@ -1182,7 +832,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       _crfController.text = "";
                       _chipIdController.text = "";
                       return AlertDialog(
-                        title: const Text("Edit Location"),
+                        title: const Text("New Form"),
                         content: SingleChildScrollView(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -1341,7 +991,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     _ispController.text = "";
                     _macController.text = "";
                     return AlertDialog(
-                      title: const Text("Edit Location"),
+                      title: const Text("New Form"),
                       content: SingleChildScrollView(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -1924,6 +1574,8 @@ class DataSearchInternet extends SearchDelegate<String>{
           }
         }));
   }
+
+
   Widget _buildListView(context, users, index){
     if(users[index]['name'].toString().toLowerCase().contains(query.toLowerCase())||
     users[index]['mobile'].toString().contains(query.toLowerCase())){
