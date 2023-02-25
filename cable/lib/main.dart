@@ -2,13 +2,13 @@
 import 'package:cable/service/storage_service.dart';
 import 'package:cached_firestorage/cached_firestorage.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:system_theme/system_theme.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
+import 'package:get/get.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import 'package:flutter/material.dart';
@@ -19,10 +19,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 main() async {
   ErrorWidget.builder = (FlutterErrorDetails details){
-    return Container(
-      child: Center(
-        child: Text("${details.exception}"),
-      ),
+    return Center(
+      child: Text("${details.exception}"),
     );
   };
   SystemTheme.accentColor;
@@ -89,18 +87,17 @@ class _MyHomePageState extends State<MyHomePage> {
 
   LatLng currentPosition = const LatLng(11.1795878, 75.9271907);
 
-  List<String> _cnameCable = [];
-  List<String> _crfCable = [];
-  List<String> _phoneCable = [];
+  final List<String> _cnameCable = [];
+  final List<String> _crfCable = [];
+  final List<String> _phoneCable = [];
 
-  List<String> _nameInternet = [];
-  List<String> _userIDInternt = [];
-  List<String> _phoneInternt = [];
+  final List<String> _nameInternet = [];
+  final List<String> _userIDInternt = [];
+  final List<String> _phoneInternt = [];
 
 
   @override
   initState() {
-    // TODO: implement initState
     super.initState();
     Geolocator.requestPermission();
     Geolocator.getCurrentPosition();
@@ -126,6 +123,26 @@ class _MyHomePageState extends State<MyHomePage> {
       throw 'Could not launch ${uri.toString()}';
     }
   }
+  updateStatus() async {
+
+        await FirebaseFirestore.instance
+            .collection('internet')
+            .where('status', isEqualTo: 'STATUS')
+            .get()
+            .then((querySnapshot) {
+          for (var element in querySnapshot.docs) {
+            element.reference.update({
+              'name': element['name'],
+              'mobile': element['mobile'],
+              'isp': element['isp'],
+              'status': 'ACTIVE'
+              // "date_time":DateFormat.jm().format(DateTime.now())
+            })
+            .whenComplete(() {
+            });
+          }
+        });
+    }
 
   getCurrentLocation() async {
     final location = await Geolocator.getCurrentPosition(
@@ -154,7 +171,7 @@ class _MyHomePageState extends State<MyHomePage> {
     AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
     var mobile = androidInfo.model;
     if(_userIDInternt.contains(userID)){
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("User Record Found")));
+        Get.snackbar("User Record Found", "");
     }else{
       await FirebaseFirestore.instance.collection("internet").add({
         'user_id': userID,
@@ -179,23 +196,23 @@ class _MyHomePageState extends State<MyHomePage> {
     var users = documentSnapshot.docs;
     XFile? image;
 
-    final ImagePicker _picker = ImagePicker();
+    final ImagePicker picker = ImagePicker();
 
     void getImagePath(ImageSource source, String crf) async {
-      image = await _picker.pickImage(
+      image = await picker.pickImage(
           source: source,
           preferredCameraDevice: CameraDevice.rear,
           requestFullMetadata: true,
-          imageQuality: 90
+          imageQuality: 85
       );
       if(image == null){
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No Image Selectecd")));
+        Get.snackbar("No Image Selected", "");
       } else{
         final filePath = image?.path;
         final fileName = '$crf.jpg';
         final Storage storage = Storage();
         storage.uploadFileCable(fileName, filePath!, true).then((value){
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Uploaded")));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Uploaded")));
         });
       }
     }
@@ -222,302 +239,16 @@ class _MyHomePageState extends State<MyHomePage> {
               title: capitalize(cname),
               snippet: crf,
               onTap: () {
-                showDialog(
+                showGeneralDialog(
                   context: context,
-                  builder: (BuildContext context) {
-                    return Dialog(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(
-                              height: 20,
-                            ),
-                            SizedBox(
-                                width: 120,
-                                height: 160,
-                                child: GestureDetector(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: FutureBuilder(
-                                      future: CachedFirestorage.instance.getDownloadURL(mapKey: crf, filePath: 'cable/$crf.jpg',),
-                                      builder:(_ ,snapshot){
-                                        if(snapshot.connectionState == ConnectionState.done){
-                                          return ClipRRect(
-                                            borderRadius: BorderRadius.circular(10),
-                                            child: Image.network(
-                                              snapshot.data!,
-                                              errorBuilder: (context, error, stackTrace) {
-                                                return const Icon(
-                                                  Icons.no_photography_outlined,
-                                                  size: 50,
-                                                );
-                                              },
-                                            ),
-                                          );
-                                        } else {
-                                          return Center(child: CircularProgressIndicator());
-                                        }
-                                      }
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    showModalBottomSheet(
-                                        context: context,
-                                        builder: (BuildContext context) {
-                                          return SizedBox(
-                                            height: 200,
-                                            child: Padding(
-                                                padding: const EdgeInsets.all(18.0),
-                                                child: Row(
-                                                  mainAxisAlignment:
-                                                  MainAxisAlignment.spaceAround,
-                                                  children: [
-                                                    IconButton(
-                                                      onPressed: () {
-                                                        Navigator.of(context).pop();
-                                                        getImagePath(
-                                                            ImageSource.camera, crf);
-                                                      },
-                                                      icon: Column(
-                                                        mainAxisSize:
-                                                        MainAxisSize.min,
-                                                        children: const [
-                                                          Icon(
-                                                            Icons.camera_alt_outlined,
-                                                            size: 60,
-                                                          ),
-                                                          Text("Camera")
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    IconButton(
-                                                      onPressed: () {
-                                                        Navigator.of(context).pop();
-                                                        getImagePath(
-                                                            ImageSource.gallery, crf);
-                                                      },
-                                                      icon: Column(
-                                                        mainAxisSize:
-                                                        MainAxisSize.min,
-                                                        children: const [
-                                                          Icon(
-                                                            Icons
-                                                                .photo_library_outlined,
-                                                            size: 60,
-                                                          ),
-                                                          Text("Gallary")
-                                                        ],
-                                                      ),
-                                                    )
-                                                  ],
-                                                )),
-                                          );
-                                        });
-                                  },
-                                )
-                            ),
-                            Text(
-                              capitalize(cname),
-                              style: const TextStyle(fontSize: 25),
-                            ),
-                            const Divider(),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                IconButton(
-                                  onPressed: () {
-                                    makeCall(mobile);
-                                  },
-                                  icon: Column(
-                                    children: const [
-                                      Icon(
-                                        Icons.call_outlined,
-                                        size: 30,
-                                      ),
-                                      Text(
-                                        "Call",
-                                      )
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: () {
-                                    openWhatapp(mobile);
-                                  },
-                                  icon: Column(
-                                    children: const [
-                                      FaIcon(FontAwesomeIcons.whatsapp,size: 30,),
-                                      Text(
-                                        "WhatsApp",
-                                      )
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: () {
-                                    navigateTo(lat, long);
-                                  },
-                                  icon: Column(
-                                    children: const [
-                                      Icon(
-                                        Icons.directions_outlined,
-                                        size: 30,
-                                      ),
-                                      Text(
-                                        "Direction",
-                                      )
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Divider(),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                const SizedBox(
-                                  width: 10,
-                                ),
-                                SizedBox(
-                                  width: 290,
-                                  child: Card(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(5),
-                                    ),
-                                    elevation: 0,
-                                    color:
-                                    Theme.of(context).colorScheme.surfaceVariant,
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: double.infinity,
-                                          padding: const EdgeInsets.only(
-                                              left: 15, top: 15),
-                                          child: const Text(
-                                            "Customer Info",
-                                            style: TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.w500),
-                                          ),
-                                        ),
-                                        ListTile(
-                                          leading: const Icon(Icons.person_outline),
-                                          title: Text(crf),
-                                          onTap: () {},
-                                        ),
-                                        ListTile(
-                                          leading: const Icon(Icons.call_outlined),
-                                          title: Text(mobile),
-                                          trailing: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              IconButton(
-                                                  onPressed: () {},
-                                                  icon: const Icon(
-                                                      Icons.message_outlined))
-                                            ],
-                                          ),
-                                          onTap: () {},
-                                        ),
-                                        ListTile(
-                                          leading:
-                                          const Icon(Icons.location_on_outlined),
-                                          title: Text(
-                                            "${lat.toString()},${long.toString()}",
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          subtitle: const Text("Home"),
-                                          trailing: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              IconButton(
-                                                  onPressed: () {},
-                                                  icon: const Icon(
-                                                      Icons.directions_outlined))
-                                            ],
-                                          ),
-                                          onTap: () {},
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(
-                                  width: 10,
-                                )
-                              ],
-                            ),
-                            const SizedBox(
-                              height: 10,
-                            )
-                          ],
-                        )
-                    );
+                  pageBuilder: (ctx, a1, a2) {
+                    return Container();
                   },
-                );
-              },
-            ),
-          );
-        }
-        else{
-          return Marker(markerId: MarkerId(user['crf']));
-
-        }
-      }).toList();
-    });
-  }
-  loadMarkerInternet() async {
-    // final String response = await rootBundle.loadString('assets/internet.json');
-    // final users = await json.decode(response);
-
-    final documentSnapshot = await FirebaseFirestore.instance.collection('internet').get(const GetOptions(source: Source.serverAndCache));
-    var users = documentSnapshot.docs;
-    setState(() {
-      _makerInternet = users.map((user) {
-        String user_id = user['user_id'];
-        String name = user['name'];
-        int phone = user['mobile'];
-        String status = user['status'];
-        String isp = user['isp'];
-        _nameInternet.add(name);
-        _phoneInternt.add(phone.toString());
-        _userIDInternt.add(user_id);
-        XFile? image;
-        final ImagePicker _picker = ImagePicker();
-
-        void getImagePath(ImageSource source, String userId) async {
-          image = await _picker.pickImage(
-              source: source,
-              preferredCameraDevice: CameraDevice.rear,
-              requestFullMetadata: true,
-              imageQuality: 85
-          );
-          if(image == null){
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No Image Selected")));
-          } else{
-            final filePath = image?.path;
-            final fileName = '$userId.jpg';
-            final Storage storage = Storage();
-            storage.uploadFileCable(fileName, filePath!, false).then((value){
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Uploaded")));
-            });
-          }
-        }
-        if(user.data().containsKey('cords')){
-          GeoPoint location  = user['cords'];
-          String mac  = user['mac'];
-          return Marker(
-              markerId: MarkerId(user_id),
-              position: LatLng(location.latitude, location.longitude),
-              infoWindow: InfoWindow(
-                title: name.toString(),
-                snippet: phone.toString(),
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return Dialog(
+                  transitionBuilder: (BuildContext context, a1, a2, child) {
+                    var curve = Curves.easeInOut.transform(a1.value);
+                    return Transform.scale(
+                      scale: curve,
+                      child: Dialog(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -531,25 +262,25 @@ class _MyHomePageState extends State<MyHomePage> {
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(10),
                                       child: FutureBuilder(
-                                          future: CachedFirestorage.instance.getDownloadURL(mapKey: user_id, filePath: 'internet/$user_id.jpg',),
-                                          builder:(_ ,snapshot){
-                                            if(snapshot.connectionState == ConnectionState.done){
-                                              return ClipRRect(
-                                                borderRadius: BorderRadius.circular(10),
-                                                child: Image.network(
-                                                  snapshot.data!,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return const Icon(
-                                                      Icons.no_photography_outlined,
-                                                      size: 50,
-                                                    );
-                                                  },
-                                                ),
-                                              );
-                                            } else {
-                                              return Center(child: CircularProgressIndicator());
-                                            }
+                                        future: CachedFirestorage.instance.getDownloadURL(mapKey: crf, filePath: 'cable/$crf.jpg',),
+                                        builder:(_ ,snapshot){
+                                          if(snapshot.connectionState == ConnectionState.done){
+                                            return ClipRRect(
+                                              borderRadius: BorderRadius.circular(10),
+                                              child: Image.network(
+                                                snapshot.data!,
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  return const Icon(
+                                                    Icons.no_photography_outlined,
+                                                    size: 50,
+                                                  );
+                                                },
+                                              ),
+                                            );
+                                          } else {
+                                            return const Center(child: CircularProgressIndicator());
                                           }
+                                        }
                                       ),
                                     ),
                                     onTap: () {
@@ -567,7 +298,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                                       IconButton(
                                                         onPressed: () {
                                                           Navigator.of(context).pop();
-                                                          getImagePath(ImageSource.camera, user_id,);
+                                                          getImagePath(
+                                                              ImageSource.camera, crf);
                                                         },
                                                         icon: Column(
                                                           mainAxisSize:
@@ -585,7 +317,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                                         onPressed: () {
                                                           Navigator.of(context).pop();
                                                           getImagePath(
-                                                              ImageSource.gallery, user_id);
+                                                              ImageSource.gallery, crf);
                                                         },
                                                         icon: Column(
                                                           mainAxisSize:
@@ -608,7 +340,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                   )
                               ),
                               Text(
-                                capitalize(name),
+                                capitalize(cname),
                                 style: const TextStyle(fontSize: 25),
                               ),
                               const Divider(),
@@ -617,7 +349,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 children: [
                                   IconButton(
                                     onPressed: () {
-                                      makeCall(phone.toString());
+                                      makeCall(mobile);
                                     },
                                     icon: Column(
                                       children: const [
@@ -633,23 +365,20 @@ class _MyHomePageState extends State<MyHomePage> {
                                   ),
                                   IconButton(
                                     onPressed: () {
-                                      openWhatapp(phone.toString());
+                                      openWhatapp(mobile);
                                     },
                                     icon: Column(
                                       children: const [
-                                        FaIcon(
-                                          FontAwesomeIcons.whatsapp,
-                                          size: 30,
-                                        ),
+                                        FaIcon(FontAwesomeIcons.whatsapp,size: 30,),
                                         Text(
-                                          "Text",
+                                          "WhatsApp",
                                         )
                                       ],
                                     ),
                                   ),
                                   IconButton(
                                     onPressed: () {
-                                      navigateTo(location.latitude, location.longitude);
+                                      navigateTo(lat, long);
                                     },
                                     icon: Column(
                                       children: const [
@@ -696,28 +425,20 @@ class _MyHomePageState extends State<MyHomePage> {
                                             ),
                                           ),
                                           ListTile(
-                                            leading:
-                                            const Icon(Icons.wifi_password),
-                                            title: Text(
-                                              "${mac}",
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            onTap: () {},
-                                          ),
-                                          ListTile(
                                             leading: const Icon(Icons.person_outline),
-                                            title: Text(user_id),
+                                            title: Text(crf),
                                             onTap: () {},
                                           ),
                                           ListTile(
                                             leading: const Icon(Icons.call_outlined),
-                                            title: Text(phone.toString()),
+                                            title: Text(mobile),
                                             trailing: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 IconButton(
                                                     onPressed: () {},
-                                                    icon: const Icon(Icons.message_outlined))
+                                                    icon: const Icon(
+                                                        Icons.message_outlined))
                                               ],
                                             ),
                                             onTap: () {},
@@ -726,15 +447,17 @@ class _MyHomePageState extends State<MyHomePage> {
                                             leading:
                                             const Icon(Icons.location_on_outlined),
                                             title: Text(
-                                              "${location.latitude},${location.longitude}",
+                                              "${lat.toString()},${long.toString()}",
                                               overflow: TextOverflow.ellipsis,
                                             ),
+                                            subtitle: const Text("Home"),
                                             trailing: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 IconButton(
                                                     onPressed: () {},
-                                                    icon: const Icon(Icons.directions_outlined))
+                                                    icon: const Icon(
+                                                        Icons.directions_outlined))
                                               ],
                                             ),
                                             onTap: () {},
@@ -753,15 +476,323 @@ class _MyHomePageState extends State<MyHomePage> {
                               )
                             ],
                           )
-                      );
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          );
+        }
+        else{
+          return Marker(markerId: MarkerId(user['crf']));
+
+        }
+      }).toList();
+    });
+  }
+  loadMarkerInternet() async {
+    // final String response = await rootBundle.loadString('assets/internet.json');
+    // final users = await json.decode(response);
+
+    final documentSnapshot = await FirebaseFirestore.instance.collection('internet').get(const GetOptions(source: Source.serverAndCache));
+    var users = documentSnapshot.docs;
+    setState(() {
+      _makerInternet = users.map((user) {
+        String userId = user['user_id'];
+        String name = user['name'];
+        int phone = user['mobile'];
+        String status = user['status'];
+        String isp = user['isp'];
+        _nameInternet.add(name);
+        _phoneInternt.add(phone.toString());
+        _userIDInternt.add(userId);
+        XFile? image;
+        final ImagePicker picker = ImagePicker();
+
+        void getImagePath(ImageSource source, String userId) async {
+          image = await picker.pickImage(
+              source: source,
+              preferredCameraDevice: CameraDevice.rear,
+              requestFullMetadata: true,
+              imageQuality: 85
+          );
+          if(image == null){
+            Get.snackbar("No Image Selected", "");
+          } else{
+            final filePath = image?.path;
+            final fileName = '$userId.jpg';
+            final Storage storage = Storage();
+            storage.uploadFileCable(fileName, filePath!, false).then((value){
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Uploaded")));
+            });
+          }
+        }
+        if(user.data().containsKey('cords')){
+          GeoPoint location  = user['cords'];
+          String mac  = user['mac'];
+          return Marker(
+              markerId: MarkerId(userId),
+              position: LatLng(location.latitude, location.longitude),
+              infoWindow: InfoWindow(
+                title: name.toString(),
+                snippet: phone.toString(),
+                onTap: () {
+                  showGeneralDialog(
+                    context: context,
+                    pageBuilder: (BuildContext context, a1, a2) {
+                      return Container();
                     },
+                    transitionBuilder: (ctx, a1, a2, child){
+                      var curve = Curves.easeInOut.transform(a1.value);
+                      return Transform.scale(
+                        scale: curve,
+                        child: Dialog(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const SizedBox(
+                                  height: 20,
+                                ),
+                                SizedBox(
+                                    width: 120,
+                                    height: 160,
+                                    child: GestureDetector(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: FutureBuilder(
+                                            future: CachedFirestorage.instance.getDownloadURL(mapKey: userId, filePath: 'internet/$userId.jpg',),
+                                            builder:(_ ,snapshot){
+                                              if(snapshot.connectionState == ConnectionState.done){
+                                                return ClipRRect(
+                                                  borderRadius: BorderRadius.circular(10),
+                                                  child: Image.network(
+                                                    snapshot.data!,
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      return const Icon(
+                                                        Icons.no_photography_outlined,
+                                                        size: 50,
+                                                      );
+                                                    },
+                                                  ),
+                                                );
+                                              } else {
+                                                return const Center(child: CircularProgressIndicator());
+                                              }
+                                            }
+                                        ),
+                                      ),
+                                      onTap: () {
+                                        showModalBottomSheet(
+                                            context: context,
+                                            builder: (BuildContext context) {
+                                              return SizedBox(
+                                                height: 200,
+                                                child: Padding(
+                                                    padding: const EdgeInsets.all(18.0),
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                      MainAxisAlignment.spaceAround,
+                                                      children: [
+                                                        IconButton(
+                                                          onPressed: () {
+                                                            Navigator.of(context).pop();
+                                                            getImagePath(ImageSource.camera, userId,);
+                                                          },
+                                                          icon: Column(
+                                                            mainAxisSize:
+                                                            MainAxisSize.min,
+                                                            children: const [
+                                                              Icon(
+                                                                Icons.camera_alt_outlined,
+                                                                size: 60,
+                                                              ),
+                                                              Text("Camera")
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        IconButton(
+                                                          onPressed: () {
+                                                            Navigator.of(context).pop();
+                                                            getImagePath(
+                                                                ImageSource.gallery, userId);
+                                                          },
+                                                          icon: Column(
+                                                            mainAxisSize:
+                                                            MainAxisSize.min,
+                                                            children: const [
+                                                              Icon(
+                                                                Icons
+                                                                    .photo_library_outlined,
+                                                                size: 60,
+                                                              ),
+                                                              Text("Gallary")
+                                                            ],
+                                                          ),
+                                                        )
+                                                      ],
+                                                    )),
+                                              );
+                                            });
+                                      },
+                                    )
+                                ),
+                                Text(
+                                  capitalize(name),
+                                  style: const TextStyle(fontSize: 25),
+                                ),
+                                const Divider(),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    IconButton(
+                                      onPressed: () {
+                                        makeCall(phone.toString());
+                                      },
+                                      icon: Column(
+                                        children: const [
+                                          Icon(
+                                            Icons.call_outlined,
+                                            size: 30,
+                                          ),
+                                          Text(
+                                            "Call",
+                                          )
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: () {
+                                        openWhatapp(phone.toString());
+                                      },
+                                      icon: Column(
+                                        children: const [
+                                          FaIcon(
+                                            FontAwesomeIcons.whatsapp,
+                                            size: 30,
+                                          ),
+                                          Text(
+                                            "Text",
+                                          )
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: () {
+                                        navigateTo(location.latitude, location.longitude);
+                                      },
+                                      icon: Column(
+                                        children: const [
+                                          Icon(
+                                            Icons.directions_outlined,
+                                            size: 30,
+                                          ),
+                                          Text(
+                                            "Direction",
+                                          )
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Divider(),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    const SizedBox(
+                                      width: 10,
+                                    ),
+                                    SizedBox(
+                                      width: 290,
+                                      child: Card(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(5),
+                                        ),
+                                        elevation: 0,
+                                        color:
+                                        Theme.of(context).colorScheme.surfaceVariant,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: double.infinity,
+                                              padding: const EdgeInsets.only(
+                                                  left: 15, top: 15),
+                                              child: const Text(
+                                                "Customer Info",
+                                                style: TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.w500),
+                                              ),
+                                            ),
+                                            ListTile(
+                                              leading:
+                                              const Icon(Icons.wifi_password),
+                                              title: Text(
+                                                mac,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              onTap: () {},
+                                            ),
+                                            ListTile(
+                                              leading: const Icon(Icons.person_outline),
+                                              title: Text(userId),
+                                              onTap: () {},
+                                            ),
+                                            ListTile(
+                                              leading: const Icon(Icons.call_outlined),
+                                              title: Text(phone.toString()),
+                                              trailing: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  IconButton(
+                                                      onPressed: () {},
+                                                      icon: const Icon(Icons.message_outlined))
+                                                ],
+                                              ),
+                                              onTap: () {},
+                                            ),
+                                            ListTile(
+                                              leading:
+                                              const Icon(Icons.location_on_outlined),
+                                              title: Text(
+                                                "${location.latitude},${location.longitude}",
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              trailing: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  IconButton(
+                                                      onPressed: () {},
+                                                      icon: const Icon(Icons.directions_outlined))
+                                                ],
+                                              ),
+                                              onTap: () {},
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(
+                                      width: 10,
+                                    )
+                                  ],
+                                ),
+                                const SizedBox(
+                                  height: 10,
+                                )
+                              ],
+                            )
+                        )
+                      );
+                    }
                   );
                 },
               )
           );
         } else {
           return Marker(
-            markerId:  MarkerId(user_id)
+            markerId:  MarkerId(userId)
           );
         }
       }).toList();
@@ -774,7 +805,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: Text("Search"),
+        title: const Text("Search"),
         actions: [
           IconButton(
               onPressed: (){
@@ -783,7 +814,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 } else{
                   showSearch(context: context, delegate: DataSearchInternet());}
                 },
-              icon: Icon(Icons.search_rounded)
+              icon: const Icon(Icons.search_rounded)
           )
         ],
       ),
@@ -812,7 +843,7 @@ class _MyHomePageState extends State<MyHomePage> {
         GoogleMap(
               onMapCreated: _onMapCreated,
               mapToolbarEnabled: false,
-              minMaxZoomPreference: MinMaxZoomPreference(14,20),
+              minMaxZoomPreference: const MinMaxZoomPreference(14,20),
               compassEnabled: true,
               cameraTargetBounds: CameraTargetBounds(LatLngBounds(
                   northeast: const LatLng(11.199369, 75.934386),
@@ -828,7 +859,7 @@ class _MyHomePageState extends State<MyHomePage> {
           cameraTargetBounds: CameraTargetBounds(LatLngBounds(
               northeast: const LatLng(11.199369, 75.934386),
               southwest: const LatLng(11.154130, 75.903564))),
-          minMaxZoomPreference: MinMaxZoomPreference(14,20),
+          minMaxZoomPreference: const MinMaxZoomPreference(14,20),
           compassEnabled: true,
           markers: Set.of(_makerInternet),
           initialCameraPosition: CameraPosition(
@@ -1000,7 +1031,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                   _cnameController.text,
                                   int.parse(_phoneCableController.text));
                               Navigator.of(context).pop;
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Saved")));
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saved")));
                             },
                             child: const Text("Save"),
                           ),
@@ -1177,7 +1208,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   });
             }
             else{
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Please Wait")));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please Wait")));
             }
           },
         ),
@@ -1198,7 +1229,7 @@ updateDataCable(GeoPoint cords, String crf, String name, int phone) async {
       .where('crf', isEqualTo: crf)
       .get()
       .then((querySnapshot) {
-    querySnapshot.docs.forEach((element) {
+    for (var element in querySnapshot.docs) {
       element.reference.update({
         'cords': cords,
         'cname': name.trim(),
@@ -1209,11 +1240,11 @@ updateDataCable(GeoPoint cords, String crf, String name, int phone) async {
       }).whenComplete(() {
         // print(querySnapshot.docs.asMap()['cname']);
       });
-    });
+    }
   });
 }
 
-updateDateInternet(GeoPoint cords, String userID, String name, int phone, String isp, String mac, String _isUdyami ) async {
+updateDateInternet(GeoPoint cords, String userID, String name, int phone, String isp, String mac, String isUdyami ) async {
   DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
   AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
   var mobile = androidInfo.model;
@@ -1223,7 +1254,7 @@ updateDateInternet(GeoPoint cords, String userID, String name, int phone, String
         .where('user_id', isEqualTo: userID)
         .get()
         .then((querySnapshot) {
-      querySnapshot.docs.forEach((element) {
+      for (var element in querySnapshot.docs) {
         element.reference.update({
           'cords': cords,
           'name': name,
@@ -1235,7 +1266,7 @@ updateDateInternet(GeoPoint cords, String userID, String name, int phone, String
           // "date_time":DateFormat.jm().format(DateTime.now())
         }).whenComplete(() {
         });
-      });
+      }
     });
   } else{
     await FirebaseFirestore.instance
@@ -1243,20 +1274,20 @@ updateDateInternet(GeoPoint cords, String userID, String name, int phone, String
         .where('user_id', isEqualTo: userID)
         .get()
         .then((querySnapshot) {
-      querySnapshot.docs.forEach((element) {
+      for (var element in querySnapshot.docs) {
         element.reference.update({
           'cords': cords,
           'name': name,
           'mobile': phone,
           'mac': mac,
           'isp': isp,
-          '_isUdyami':_isUdyami == 'N'?false:true,
+          '_isUdyami':isUdyami == 'N'?false:true,
           'updated_by':mobile,
           'date_time': "${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year} ${DateTime.now().hour % 12}:${DateTime.now().minute}"
           // "date_time":DateFormat.jm().format(DateTime.now())
         }).whenComplete(() {
         });
-      });
+      }
     });
   }
 }
@@ -1289,7 +1320,7 @@ class DataSearchCable extends SearchDelegate<String> {
           onPressed: (){
             query = "";
           },
-          icon: Icon(Icons.clear))
+          icon: const Icon(Icons.clear))
     ];
   }
 
@@ -1307,9 +1338,12 @@ class DataSearchCable extends SearchDelegate<String> {
   }
 
   @override
-  Widget buildResults(BuildContext context) {
-    // TODO: implement buildResults
-    throw UnimplementedError();
+  Widget buildResults(BuildContext buildcontext) {
+    return Builder(builder: (context) {
+      Navigator.of(buildcontext).pop();
+      return Visibility(visible: false,child: Text("Result"));
+  
+    });
   }
 
   @override
@@ -1326,10 +1360,10 @@ class DataSearchCable extends SearchDelegate<String> {
                     return _buildListView(buildContext, users, index);
                   });
             } else{
-              return ListTile(title: Text("No Data Found"),);
+              return const ListTile(title: Text("No Data Found"),);
             }
           } else{
-            return Center(child: CircularProgressIndicator(),);
+            return const Center(child: CircularProgressIndicator(),);
           }
     }));
   }
@@ -1360,12 +1394,12 @@ class DataSearchCable extends SearchDelegate<String> {
                     ),
                   );
                 } else {
-                  return Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator());
                 }
               }
           ),
         ),
-        subtitle: Text('${users[index]['crf']}\n${users[index]['mobile']}', style: TextStyle(fontWeight: FontWeight.w100),),
+        subtitle: Text('${users[index]['crf']}\n${users[index]['mobile']}', style: const TextStyle(fontWeight: FontWeight.w100),),
         isThreeLine: true,
         onTap: (){
           double lat = (users[index]['cords'] as GeoPoint).latitude;
@@ -1389,7 +1423,7 @@ class DataSearchCable extends SearchDelegate<String> {
                   MainAxisAlignment.start,
                   children: [
 
-                    SizedBox(height: 10,),
+                    const SizedBox(height: 10,),
                     SizedBox(
                       child: TextField(
                         enabled: false,
@@ -1523,7 +1557,7 @@ class DataSearchCable extends SearchDelegate<String> {
                         _cnameController.text,
                         int.parse(_phoneController.text));
                     Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Saved")));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saved")));
                   },
                   child: const Text("Save"),
                 ),
@@ -1533,7 +1567,7 @@ class DataSearchCable extends SearchDelegate<String> {
         },
       );
     } else{
-      return SizedBox(height: 0,);
+      return const SizedBox(height: 0,);
     }
   }
 
@@ -1558,7 +1592,7 @@ class DataSearchInternet extends SearchDelegate<String>{
           onPressed: (){
             query = "";
           },
-          icon: Icon(Icons.clear))
+          icon: const Icon(Icons.clear))
     ];
   }
   @override
@@ -1592,10 +1626,10 @@ class DataSearchInternet extends SearchDelegate<String>{
                     return _buildListView(buildContext, users, index);
                   });
             } else{
-              return ListTile(title: Text("No Data Found"),);
+              return const ListTile(title: Text("No Data Found"),);
             }
           } else{
-            return Center(child: CircularProgressIndicator(),);
+            return const Center(child: CircularProgressIndicator(),);
           }
         }));
   }
@@ -1626,12 +1660,12 @@ class DataSearchInternet extends SearchDelegate<String>{
                     ),
                   );
                 } else {
-                  return Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator());
                 }
               }
           ),
         ),
-        subtitle: Text("${users[index]['mobile'].toString()}\n${users[index]['user_id']}", style: TextStyle(fontWeight: FontWeight.w100),),
+        subtitle: Text("${users[index]['mobile'].toString()}\n${users[index]['user_id']}", style: const TextStyle(fontWeight: FontWeight.w100),),
         isThreeLine: true,
         onTap: (){
           try{
@@ -1643,7 +1677,7 @@ class DataSearchInternet extends SearchDelegate<String>{
             _latController.text = lat.toString();
             _longController.text = long.toString();
           }
-          String user_id = users[index]['user_id'].toString();
+          String userId = users[index]['user_id'].toString();
           String name = users[index]['name'];
           String mobile = users[index]['mobile'].toString();
           String isp = users[index]['isp'];
@@ -1652,7 +1686,7 @@ class DataSearchInternet extends SearchDelegate<String>{
             _nameController.text = capitalize(name);
             _phoneInternetController.text = capitalize(mobile);
             _ispController.text = isp;
-            _userIDController.text = user_id;
+            _userIDController.text = userId;
             _macController.text="";
             return AlertDialog(
               title: const Text("Edit Form"),
@@ -1745,7 +1779,7 @@ class DataSearchInternet extends SearchDelegate<String>{
                         ),
                         Visibility(
                             visible: _ispController.text == 'BSNL'?true:false,
-                            child: SizedBox(width: 10,)
+                            child: const SizedBox(width: 10,)
                         ),
                         Visibility(
                           visible: _ispController.text == 'BSNL'?true:false,
@@ -1755,7 +1789,7 @@ class DataSearchInternet extends SearchDelegate<String>{
                               textAlign: TextAlign.center,
                               controller: _isUdyamiController,
                               decoration: InputDecoration(
-                                label: Text('UDM'),
+                                label: const Text('UDM'),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(20))
                               ),
                               textCapitalization: TextCapitalization.characters,
@@ -1779,7 +1813,7 @@ class DataSearchInternet extends SearchDelegate<String>{
                             ),
                             label: const Text("MAC"),
                             suffixIcon: IconButton(
-                              icon: Icon(Icons.camera_alt_outlined),
+                              icon: const Icon(Icons.camera_alt_outlined),
                               onPressed: () async {
                                 final barcodeScanRes = await FlutterBarcodeScanner.scanBarcode('#ff0000', 'Cancel', true, ScanMode.BARCODE);
                                 if(barcodeScanRes == "-1"){
@@ -1867,7 +1901,7 @@ class DataSearchInternet extends SearchDelegate<String>{
                   onPressed: () {
                     updateDateInternet(
                         GeoPoint(double.parse(_latController.text), double.parse(_longController.text)),
-                        user_id,
+                        userId,
                         _nameController.text,
                         int.parse(_phoneInternetController.text),
                         _ispController.text,
@@ -1875,7 +1909,7 @@ class DataSearchInternet extends SearchDelegate<String>{
                       _isUdyamiController.text
                     );
                     Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Saved")));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saved")));
                   },
                   child: const Text("Save"),
                 ),
@@ -1885,7 +1919,7 @@ class DataSearchInternet extends SearchDelegate<String>{
         },
       );
     } else{
-      return SizedBox(height: 0,);
+      return const SizedBox(height: 0,);
     }
   }
 }

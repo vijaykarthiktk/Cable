@@ -10,7 +10,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 void main() {
   SystemTheme.accentColor;
-
   runApp(const MyApp());
 }
 
